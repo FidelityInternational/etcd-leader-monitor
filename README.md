@@ -1,7 +1,7 @@
 # etcd-leader-monitor
 
 [![codecov.io](https://codecov.io/github/FidelityInternational/etcd-leader-monitor/coverage.svg?branch=master)](https://codecov.io/github/FidelityInternational/etcd-leader-monitor?branch=master)
-[![Go Report Card](https://goreportcard.com/badge/github.com/FidelityInternational/etcd-leader-monitor)
+[![Go Report Card]](https://goreportcard.com/badge/github.com/FidelityInternational/etcd-leader-monitor)
 [![Build Status](https://travis-ci.org/FidelityInternational/etcd-leader-monitor.svg?branch=master)](https://travis-ci.org/FidelityInternational/etcd-leader-monitor)
 
 An application deployable to CF that checks the health state of etcd clusters.
