@@ -1,0 +1,42 @@
+{
+	"ImportPath": "etcd-leader-monitor",
+	"GoVersion": "go1.6",
+	"GodepVersion": "v62",
+	"Deps": [
+		{
+			"ImportPath": "github.com/FidelityInternational/virgil/Godeps/_workspace/src/github.com/cloudfoundry-community/go-cfclient",
+			"Comment": "v1.0.0",
+			"Rev": "0220a57cd51e8cb2ea0c1cb04dd004f56ffedd28"
+		},
+		{
+			"ImportPath": "github.com/FidelityInternational/virgil/Godeps/_workspace/src/golang.org/x/net/context",
+			"Comment": "v1.0.0",
+			"Rev": "0220a57cd51e8cb2ea0c1cb04dd004f56ffedd28"
+		},
+		{
+			"ImportPath": "github.com/FidelityInternational/virgil/Godeps/_workspace/src/golang.org/x/oauth2",
+			"Comment": "v1.0.0",
+			"Rev": "0220a57cd51e8cb2ea0c1cb04dd004f56ffedd28"
+		},
+		{
+			"ImportPath": "github.com/FidelityInternational/virgil/Godeps/_workspace/src/golang.org/x/oauth2/internal",
+			"Comment": "v1.0.0",
+			"Rev": "0220a57cd51e8cb2ea0c1cb04dd004f56ffedd28"
+		},
+		{
+			"ImportPath": "github.com/FidelityInternational/virgil/utility",
+			"Comment": "v1.0.0",
+			"Rev": "0220a57cd51e8cb2ea0c1cb04dd004f56ffedd28"
+		},
+		{
+			"ImportPath": "github.com/gorilla/context",
+			"Comment": "v1.1-2-ga8d44e7",
+			"Rev": "a8d44e7d8e4d532b6a27a02dd82abb31cc1b01bd"
+		},
+		{
+			"ImportPath": "github.com/gorilla/mux",
+			"Comment": "v1.1",
+			"Rev": "0eeaf8392f5b04950925b8a69fe70f110fa7cbfc"
+		}
+	]
+}
