@@ -53,4 +53,11 @@ CF_NETWORK=<10.0.0.0/24> \
 
 `go test -v ./...`
 
+#### Smoke Tests
+
+```
+APP_URL=<etcd-leader-monitor.apps.example.com> \
+./smoke-test.sh
+```
+
 This application has been tested with go version 1.6 and version 1.7.7 of the CF Go buildpack
