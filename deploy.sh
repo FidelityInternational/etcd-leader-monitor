@@ -36,10 +36,10 @@ if [ $? -eq 0 ]; then
   echo "Zero downtime deploying etcd-leader-monitor..."
   domain=$(cf app etcd-leader-monitor | grep urls | cut -d":" -f2 | xargs | cut -d"." -f 2-)
   cf push etcd-leader-monitor-green -f manifest.yml -n etcd-leader-monitor-green --no-start
-  cf set-env etcd-leader-monitor BOSH_USERNAME "$BOSH_DIRECTOR_USERNAME"
-  cf set-env etcd-leader-monitor BOSH_PASSWORD "$BOSH_DIRECTOR_PASSWORD"
-  cf set-env etcd-leader-monitor BOSH_URI "$BOSH_DIRECTOR_PRIVATE_IP"
-  cf set-env etcd-leader-monitor BOSH_PORT 25555
+  cf set-env etcd-leader-monitor-green BOSH_USERNAME "$BOSH_DIRECTOR_USERNAME"
+  cf set-env etcd-leader-monitor-green BOSH_PASSWORD "$BOSH_DIRECTOR_PASSWORD"
+  cf set-env etcd-leader-monitor-green BOSH_URI "$BOSH_DIRECTOR_PRIVATE_IP"
+  cf set-env etcd-leader-monitor-green BOSH_PORT 25555
   cf start etcd-leader-monitor-green
   cf map-route etcd-leader-monitor-green "$domain" -n etcd-leader-monitor
   cf delete etcd-leader-monitor -f
