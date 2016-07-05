@@ -24,6 +24,8 @@ These JSON responses are intended to make it easy to integrate with a health mon
 
 ### Deployment
 
+#### Manual deployment
+
 ```
 cf target -o <my_org> -s <my_space>
 cf push --no-start
@@ -32,6 +34,19 @@ cf set-env etcd-leader-monitor BOSH_PASSWORD <BOSH_DIRECTOR_PASSWORD>
 cf set-env etcd-leader-monitor BOSH_URI <BOSH_DIRECTOR_PRIVATE_IP>
 cf set-env etcd-leader-monitor BOSH_PORT 25555
 cf start etcd-leader-monitor
+```
+
+#### Automated zero-downtime deployment
+
+```
+BOSH_DIRECTOR_USERNAME=<username> \
+BOSH_DIRECTOR_PASSWORD=<password> \
+BOSH_DIRECTOR_PRIVATE_IP=<10.0.0.6> \
+CF_SYS_DOMAIN=<system.example.com> \
+CF_DEPLOY_USERNAME=<cf-username> \
+CF_DEPLOY_PASSWORD=<cf-password> \
+CF_NETWORK=<10.0.0.0/24> \
+./deploy.sh
 ```
 
 ### Testing
