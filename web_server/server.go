@@ -1,8 +1,8 @@
 package webServer
 
 import (
-	"github.com/FidelityInternational/etcd-leader-monitor/bosh"
 	"github.com/gorilla/mux"
+	"github.com/srbry/gogobosh"
 	"net/http"
 )
 
@@ -12,7 +12,7 @@ type Server struct {
 }
 
 // CreateServer - creates a server
-func CreateServer(boshClient *bosh.Client, etcdHTTPClient *http.Client) *Server {
+func CreateServer(boshClient *gogobosh.Client, etcdHTTPClient *http.Client) *Server {
 	controller := CreateController(boshClient, etcdHTTPClient)
 
 	return &Server{

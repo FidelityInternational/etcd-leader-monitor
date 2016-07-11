@@ -2,21 +2,25 @@ package main
 
 import (
 	"fmt"
-	"github.com/FidelityInternational/etcd-leader-monitor/bosh"
 	webs "github.com/FidelityInternational/etcd-leader-monitor/web_server"
+	"github.com/srbry/gogobosh"
 	"net/http"
 	"os"
 )
 
 func main() {
-	boshConfig := &bosh.Config{
+	boshConfig := &gogobosh.Config{
 		Username:          os.Getenv("BOSH_USERNAME"),
 		Password:          os.Getenv("BOSH_PASSWORD"),
-		BoshURI:           os.Getenv("BOSH_URI"),
-		Port:              os.Getenv("BOSH_PORT"),
-		SkipSSLValidation: true,
+		BOSHAddress:       os.Getenv("BOSH_URI"),
+		SkipSslValidation: true,
 	}
-	boshClient := bosh.NewClient(boshConfig)
+	boshClient, err := gogobosh.NewClient(boshConfig)
+	if err != nil {
+		fmt.Println("Could not create bosh client")
+		fmt.Println(err)
+		os.Exit(1)
+	}
 
 	server := webs.CreateServer(boshClient, &http.Client{})
 
@@ -24,7 +28,7 @@ func main() {
 
 	http.Handle("/", router)
 
-	err := http.ListenAndServe(":"+os.Getenv("PORT"), nil)
+	err = http.ListenAndServe(":"+os.Getenv("PORT"), nil)
 	if err != nil {
 		fmt.Println("ListenAndServe:", err)
 	}

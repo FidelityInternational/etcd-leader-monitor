@@ -4,17 +4,18 @@ import (
 	"fmt"
 	"github.com/FidelityInternational/etcd-leader-monitor/bosh"
 	"github.com/FidelityInternational/etcd-leader-monitor/etcd"
+	"github.com/srbry/gogobosh"
 	"net/http"
 )
 
 // Controller struct
 type Controller struct {
-	BoshClient     *bosh.Client
+	BoshClient     *gogobosh.Client
 	EtcdHTTPClient *http.Client
 }
 
 // CreateController - returns a populated controller object
-func CreateController(boshClient *bosh.Client, etcdHTTPClient *http.Client) *Controller {
+func CreateController(boshClient *gogobosh.Client, etcdHTTPClient *http.Client) *Controller {
 	return &Controller{
 		BoshClient:     boshClient,
 		EtcdHTTPClient: etcdHTTPClient,
@@ -32,28 +33,28 @@ func (c *Controller) CheckLeaders(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("Checking Leaders...")
 	fmt.Println("Fetching Etcd IPs from BOSH...")
-	deployment, err := c.BoshClient.SearchDeployment("^cf-.+")
+	deployments, err := c.BoshClient.GetDeployments()
 	if err != nil {
 		fmt.Println("An error occured:")
 		fmt.Println(err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	deployment := bosh.FindDeployment(deployments, "^cf-.+")
 	fmt.Println("Found deployment: ", deployment)
-	boshVMs, err := c.BoshClient.GetEtcdVMs(deployment)
+	boshVMs, err := c.BoshClient.GetDeploymentVMs(deployment)
 	if err != nil {
 		fmt.Println("An error occured:")
 		fmt.Println(err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	etcdVMs := bosh.FindVMs(boshVMs, "^etcd_server.+$")
 	fmt.Println("Found Etcd VMs")
-	etcdIPs := boshVMs.GetAllIPs()
-	fmt.Println("Found VM IPs", etcdIPs)
 	leaderList = make(map[string]map[bool]int)
-	for _, etcdIP := range etcdIPs {
+	for _, etcdVM := range etcdVMs {
 		etcdConfig := &etcd.Config{
-			EtcdIP:     etcdIP,
+			EtcdIP:     etcdVM.IPs[0],
 			HTTPClient: c.EtcdHTTPClient,
 		}
 		etcdClient := etcd.NewClient(etcdConfig)
@@ -66,13 +67,13 @@ func (c *Controller) CheckLeaders(w http.ResponseWriter, r *http.Request) {
 		}
 		leaderInfo = make(map[bool]int)
 		leaderInfo[leader] = followers
-		leaderList[etcdIP] = leaderInfo
+		leaderList[etcdVM.IPs[0]] = leaderInfo
 	}
 	for _, leaderItem := range leaderList {
 		for leader, followers := range leaderItem {
 			if leader == true {
 				leaderCount++
-				if followers != (len(etcdIPs) - 1) {
+				if followers != (len(etcdVMs) - 1) {
 					httpResponseMessage = `{"healthy": false, "message": "Incorrect number of followers"}`
 				}
 			}

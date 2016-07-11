@@ -3,11 +3,11 @@ package webServer_test
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/FidelityInternational/etcd-leader-monitor/bosh"
 	webs "github.com/FidelityInternational/etcd-leader-monitor/web_server"
 	"github.com/gorilla/mux"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/srbry/gogobosh"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -27,7 +27,7 @@ func init() {
 var _ = Describe("Server", func() {
 	Describe("#CreateServer", func() {
 		It("returns a server object", func() {
-			Ω(webs.CreateServer(&bosh.Client{}, &http.Client{})).Should(BeAssignableToTypeOf(&webs.Server{}))
+			Ω(webs.CreateServer(&gogobosh.Client{}, &http.Client{})).Should(BeAssignableToTypeOf(&webs.Server{}))
 		})
 	})
 })
@@ -35,7 +35,7 @@ var _ = Describe("Server", func() {
 var _ = Describe("Contoller", func() {
 	Describe("#CreateController", func() {
 		It("returns a controller object", func() {
-			controller := webs.CreateController(&bosh.Client{}, &http.Client{})
+			controller := webs.CreateController(&gogobosh.Client{}, &http.Client{})
 			Ω(controller).Should(BeAssignableToTypeOf(&webs.Controller{}))
 		})
 	})
@@ -54,16 +54,19 @@ var _ = Describe("Contoller", func() {
 
 		Context("when a bosh deployment cannot be found", func() {
 			BeforeEach(func() {
-				boshConfig := &bosh.Config{
-					Username:          "example_user",
-					Password:          "example_password",
-					BoshURI:           "bosh_uri.example.com",
-					Port:              "25555",
-					SkipSSLValidation: true,
+				setup(MockRoute{"GET", "/stemcells", `{}`, ""}, "basic")
+				boshConfig := &gogobosh.Config{
+					Username:    "example_user",
+					Password:    "example_password",
+					BOSHAddress: fakeServer.URL,
 				}
-				boshClient := bosh.NewClient(boshConfig)
+				boshClient, _ := gogobosh.NewClient(boshConfig)
 				controller = webs.CreateController(boshClient, &http.Client{})
 				mockRecorder = httptest.NewRecorder()
+			})
+
+			AfterEach(func() {
+				teardown()
 			})
 
 			It("returns an error 500", func() {
@@ -71,13 +74,10 @@ var _ = Describe("Contoller", func() {
 			})
 		})
 
-		Context("when bosh.GetEtcdVMs returns an error", func() {
+		Context("when getting bosh vms returns an error", func() {
 			BeforeEach(func() {
-				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					if r.URL.String() == "http://bosh_uri.example.com:25555/deployments" {
-						w.WriteHeader(200)
-						w.Header().Set("Content-Type", "application/json")
-						fmt.Fprintln(w, `[
+				setupMultiple([]MockRoute{
+					{"GET", "/deployments", `[
    {
       "name":"cf-12345",
       "releases":[
@@ -93,46 +93,26 @@ var _ = Describe("Contoller", func() {
          }
       ]
    }
-]`)
-					} else if r.URL.String() == "http://bosh_uri.example.com:25555/deployments/cf-12345/vms?format=full" {
-						w.Header().Set("Content-Type", "application/json")
-						w.Header().Set("Location", "http://bosh_uri.example.com:25555/tasks/1")
-						w.WriteHeader(302)
-						fmt.Fprintln(w, `{"id":1,"state":"queued","description":"retrieve vm-stats","timestamp":1460639781,"result":"","user":"example_user"}`)
-					} else if r.URL.String() == "http://bosh_uri.example.com:25555/tasks/1" {
-						w.Header().Set("Content-Type", "application/json")
-						w.Header().Set("Location", "http://bosh_uri.example.com:25555/tasks/1/output?type=result")
-						w.WriteHeader(200)
-						// state must be "done" to prevent infinite loop
-						fmt.Fprintln(w, `{"id":1,"state":"done","description":"retrieve vm-stats","timestamp":1460639781,"result":"","user":"example_user"}`)
-					} else {
-						w.Header().Set("Content-Type", "application/json")
-						w.WriteHeader(200)
-						fmt.Fprintln(w, `":["30.30.30_id""11","job_name":"etcd_server-d284104a9345228c01e2","index":0}
+]`, ""},
+					{"GET", "/deployments/cf-12345/vms", `{"id":1,"state":"queued","description":"retrieve vm-stats","timestamp":1460639781,"result":"","user":"example_user"}`, fakeServer.URL + "/tasks/1"},
+					{"GET", "/tasks/1", `{"id":1,"state":"done","description":"retrieve vm-stats","timestamp":1460639781,"result":"","user":"example_user"}`, ""},
+					{"GET", "/tasks/1/output", `":["30.30.30_id""11","job_name":"etcd_server-d284104a9345228c01e2","index":0}
 {"vm_cid":"2","ips":["31.31.31.31"],"agent_id":"2","job_name":"etcd_server-d284104a9345228c01e2","index":1}
-{"vm_cid":"6","ips":["32.32.32.32"],"agent_id":"6","job_name":"etcd_server-d284104a9345228c01e2","index":2}`)
-					}
-				}))
+{"vm_cid":"6","ips":["32.32.32.32"],"agent_id":"6","job_name":"etcd_server-d284104a9345228c01e2","index":2}`, ""},
+				}, "basic")
 
-				transport := &http.Transport{
-					Proxy: func(req *http.Request) (*url.URL, error) {
-						return url.Parse(server.URL)
-					},
-					TLSClientConfig: &tls.Config{},
+				boshConfig := &gogobosh.Config{
+					Username:    "example_user",
+					Password:    "example_password",
+					BOSHAddress: fakeServer.URL,
 				}
-				httpClient := &http.Client{Transport: transport}
-
-				boshConfig := &bosh.Config{
-					Username:          "example_user",
-					Password:          "example_password",
-					BoshURI:           "bosh_uri.example.com",
-					Port:              "25555",
-					HTTPClient:        httpClient,
-					InsecureTransport: true,
-				}
-				boshClient := bosh.NewClient(boshConfig)
+				boshClient, _ := gogobosh.NewClient(boshConfig)
 				controller = webs.CreateController(boshClient, &http.Client{})
 				mockRecorder = httptest.NewRecorder()
+			})
+
+			AfterEach(func() {
+				teardown()
 			})
 
 			It("returns an error 500", func() {
@@ -142,64 +122,38 @@ var _ = Describe("Contoller", func() {
 
 		Context("when fetching leader stats returns an error", func() {
 			BeforeEach(func() {
-				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					if r.URL.String() == "http://bosh_uri.example.com:25555/deployments" {
-						w.WriteHeader(200)
-						w.Header().Set("Content-Type", "application/json")
-						fmt.Fprintln(w, `[
-		   {
-		      "name":"cf-12345",
-		      "releases":[
-		         {
-		            "name":"example_release",
-		            "version":"2"
-		         }
-		      ],
-		      "stemcells":[
-		         {
-		            "name":"example_stemcell",
-		            "version":"1"
-		         }
-		      ]
-		   }
-		]`)
-					} else if r.URL.String() == "http://bosh_uri.example.com:25555/deployments/cf-12345/vms?format=full" {
-						w.Header().Set("Content-Type", "application/json")
-						w.Header().Set("Location", "http://bosh_uri.example.com:25555/tasks/1")
-						w.WriteHeader(302)
-						fmt.Fprintln(w, `{"id":1,"state":"queued","description":"retrieve vm-stats","timestamp":1460639781,"result":"","user":"example_user"}`)
-					} else if r.URL.String() == "http://bosh_uri.example.com:25555/tasks/1" {
-						w.Header().Set("Content-Type", "application/json")
-						w.Header().Set("Location", "http://bosh_uri.example.com:25555/tasks/1/output?type=result")
-						w.WriteHeader(200)
-						// state must be "done" to prevent infinite loop
-						fmt.Fprintln(w, `{"id":1,"state":"done","description":"retrieve vm-stats","timestamp":1460639781,"result":"","user":"example_user"}`)
-					} else {
-						w.Header().Set("Content-Type", "application/json")
-						w.WriteHeader(200)
-						fmt.Fprintln(w, `{"vm_cid":"11","ips":["30.30.30.30"],"agent_id":"11","job_name":"etcd_server-d284104a9345228c01e2","index":0}
+				setupMultiple([]MockRoute{
+					{"GET", "/deployments", `[
+   {
+      "name":"cf-12345",
+      "releases":[
+         {
+            "name":"example_release",
+            "version":"2"
+         }
+      ],
+      "stemcells":[
+         {
+            "name":"example_stemcell",
+            "version":"1"
+         }
+      ]
+   }
+]`, ""},
+					{"GET", "/deployments/cf-12345/vms", `{"id":1,"state":"queued","description":"retrieve vm-stats","timestamp":1460639781,"result":"","user":"example_user"}`, fakeServer.URL + "/tasks/1"},
+					{"GET", "/tasks/1", `{"id":1,"state":"done","description":"retrieve vm-stats","timestamp":1460639781,"result":"","user":"example_user"}`, ""},
+					{"GET", "/tasks/1/output", `{"vm_cid":"11","ips":["30.30.30.30"],"agent_id":"11","job_name":"etcd_server-d284104a9345228c01e2","index":0}
 {"vm_cid":"2","ips":["31.31.31.31"],"agent_id":"2","job_name":"etcd_server-d284104a9345228c01e2","index":1}
-{"vm_cid":"6","ips":["32.32.32.32"],"agent_id":"6","job_name":"etcd_server-d284104a9345228c01e2","index":2}`)
-					}
-				}))
+{"vm_cid":"6","ips":["32.32.32.32"],"agent_id":"6","job_name":"etcd_server-d284104a9345228c01e2","index":2}`, ""},
+				}, "basic")
 
-				transport := &http.Transport{
-					Proxy: func(req *http.Request) (*url.URL, error) {
-						return url.Parse(server.URL)
-					},
-					TLSClientConfig: &tls.Config{},
+				boshConfig := &gogobosh.Config{
+					Username:    "example_user",
+					Password:    "example_password",
+					BOSHAddress: fakeServer.URL,
 				}
-				httpClient := &http.Client{Transport: transport}
 
-				boshConfig := &bosh.Config{
-					Username:          "example_user",
-					Password:          "example_password",
-					BoshURI:           "bosh_uri.example.com",
-					Port:              "25555",
-					HTTPClient:        httpClient,
-					InsecureTransport: true,
-				}
-				boshClient := bosh.NewClient(boshConfig)
+				boshClient, _ := gogobosh.NewClient(boshConfig)
 
 				etcdServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.WriteHeader(200)
@@ -219,6 +173,10 @@ var _ = Describe("Contoller", func() {
 				mockRecorder = httptest.NewRecorder()
 			})
 
+			AfterEach(func() {
+				teardown()
+			})
+
 			It("returns an error 500", func() {
 				Ω(mockRecorder.Code).Should(Equal(500))
 			})
@@ -226,64 +184,38 @@ var _ = Describe("Contoller", func() {
 
 		Context("when the number of followers is incorrect", func() {
 			BeforeEach(func() {
-				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					if r.URL.String() == "http://bosh_uri.example.com:25555/deployments" {
-						w.WriteHeader(200)
-						w.Header().Set("Content-Type", "application/json")
-						fmt.Fprintln(w, `[
-		   {
-		      "name":"cf-12345",
-		      "releases":[
-		         {
-		            "name":"example_release",
-		            "version":"2"
-		         }
-		      ],
-		      "stemcells":[
-		         {
-		            "name":"example_stemcell",
-		            "version":"1"
-		         }
-		      ]
-		   }
-		]`)
-					} else if r.URL.String() == "http://bosh_uri.example.com:25555/deployments/cf-12345/vms?format=full" {
-						w.Header().Set("Content-Type", "application/json")
-						w.Header().Set("Location", "http://bosh_uri.example.com:25555/tasks/1")
-						w.WriteHeader(302)
-						fmt.Fprintln(w, `{"id":1,"state":"queued","description":"retrieve vm-stats","timestamp":1460639781,"result":"","user":"example_user"}`)
-					} else if r.URL.String() == "http://bosh_uri.example.com:25555/tasks/1" {
-						w.Header().Set("Content-Type", "application/json")
-						w.Header().Set("Location", "http://bosh_uri.example.com:25555/tasks/1/output?type=result")
-						w.WriteHeader(200)
-						// state must be "done" to prevent infinite loop
-						fmt.Fprintln(w, `{"id":1,"state":"done","description":"retrieve vm-stats","timestamp":1460639781,"result":"","user":"example_user"}`)
-					} else {
-						w.Header().Set("Content-Type", "application/json")
-						w.WriteHeader(200)
-						fmt.Fprintln(w, `{"vm_cid":"11","ips":["30.30.30.30"],"agent_id":"11","job_name":"etcd_server-d284104a9345228c01e2","index":0}
-		{"vm_cid":"2","ips":["31.31.31.31"],"agent_id":"2","job_name":"etcd_server-d284104a9345228c01e2","index":1}
-		{"vm_cid":"6","ips":["32.32.32.32"],"agent_id":"6","job_name":"etcd_server-d284104a9345228c01e2","index":2}`)
-					}
-				}))
+				setupMultiple([]MockRoute{
+					{"GET", "/deployments", `[
+   {
+      "name":"cf-12345",
+      "releases":[
+         {
+            "name":"example_release",
+            "version":"2"
+         }
+      ],
+      "stemcells":[
+         {
+            "name":"example_stemcell",
+            "version":"1"
+         }
+      ]
+   }
+]`, ""},
+					{"GET", "/deployments/cf-12345/vms", `{"id":1,"state":"queued","description":"retrieve vm-stats","timestamp":1460639781,"result":"","user":"example_user"}`, fakeServer.URL + "/tasks/1"},
+					{"GET", "/tasks/1", `{"id":1,"state":"done","description":"retrieve vm-stats","timestamp":1460639781,"result":"","user":"example_user"}`, ""},
+					{"GET", "/tasks/1/output", `{"vm_cid":"11","ips":["30.30.30.30"],"agent_id":"11","job_name":"etcd_server-d284104a9345228c01e2","index":0}
+{"vm_cid":"2","ips":["31.31.31.31"],"agent_id":"2","job_name":"etcd_server-d284104a9345228c01e2","index":1}
+{"vm_cid":"6","ips":["32.32.32.32"],"agent_id":"6","job_name":"etcd_server-d284104a9345228c01e2","index":2}`, ""},
+				}, "basic")
 
-				transport := &http.Transport{
-					Proxy: func(req *http.Request) (*url.URL, error) {
-						return url.Parse(server.URL)
-					},
-					TLSClientConfig: &tls.Config{},
+				boshConfig := &gogobosh.Config{
+					Username:    "example_user",
+					Password:    "example_password",
+					BOSHAddress: fakeServer.URL,
 				}
-				httpClient := &http.Client{Transport: transport}
 
-				boshConfig := &bosh.Config{
-					Username:          "example_user",
-					Password:          "example_password",
-					BoshURI:           "bosh_uri.example.com",
-					Port:              "25555",
-					HTTPClient:        httpClient,
-					InsecureTransport: true,
-				}
-				boshClient := bosh.NewClient(boshConfig)
+				boshClient, _ := gogobosh.NewClient(boshConfig)
 
 				etcdServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					if r.URL.String() == "http://30.30.30.30:4001/v2/stats/leader" {
@@ -309,6 +241,10 @@ var _ = Describe("Contoller", func() {
 				mockRecorder = httptest.NewRecorder()
 			})
 
+			AfterEach(func() {
+				teardown()
+			})
+
 			It("returns a suitable json response", func() {
 				Ω(mockRecorder.Code).Should(Equal(200))
 				Expect(mockRecorder.Body.String()).Should(Equal(`{"healthy": false, "message": "Incorrect number of followers"}`))
@@ -317,64 +253,38 @@ var _ = Describe("Contoller", func() {
 
 		Context("when more than one etcd thinks it is the leader", func() {
 			BeforeEach(func() {
-				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					if r.URL.String() == "http://bosh_uri.example.com:25555/deployments" {
-						w.WriteHeader(200)
-						w.Header().Set("Content-Type", "application/json")
-						fmt.Fprintln(w, `[
-		   {
-		      "name":"cf-12345",
-		      "releases":[
-		         {
-		            "name":"example_release",
-		            "version":"2"
-		         }
-		      ],
-		      "stemcells":[
-		         {
-		            "name":"example_stemcell",
-		            "version":"1"
-		         }
-		      ]
-		   }
-		]`)
-					} else if r.URL.String() == "http://bosh_uri.example.com:25555/deployments/cf-12345/vms?format=full" {
-						w.Header().Set("Content-Type", "application/json")
-						w.Header().Set("Location", "http://bosh_uri.example.com:25555/tasks/1")
-						w.WriteHeader(302)
-						fmt.Fprintln(w, `{"id":1,"state":"queued","description":"retrieve vm-stats","timestamp":1460639781,"result":"","user":"example_user"}`)
-					} else if r.URL.String() == "http://bosh_uri.example.com:25555/tasks/1" {
-						w.Header().Set("Content-Type", "application/json")
-						w.Header().Set("Location", "http://bosh_uri.example.com:25555/tasks/1/output?type=result")
-						w.WriteHeader(200)
-						// state must be "done" to prevent infinite loop
-						fmt.Fprintln(w, `{"id":1,"state":"done","description":"retrieve vm-stats","timestamp":1460639781,"result":"","user":"example_user"}`)
-					} else {
-						w.Header().Set("Content-Type", "application/json")
-						w.WriteHeader(200)
-						fmt.Fprintln(w, `{"vm_cid":"11","ips":["30.30.30.30"],"agent_id":"11","job_name":"etcd_server-d284104a9345228c01e2","index":0}
-		{"vm_cid":"2","ips":["31.31.31.31"],"agent_id":"2","job_name":"etcd_server-d284104a9345228c01e2","index":1}
-		{"vm_cid":"6","ips":["32.32.32.32"],"agent_id":"6","job_name":"etcd_server-d284104a9345228c01e2","index":2}`)
-					}
-				}))
+				setupMultiple([]MockRoute{
+					{"GET", "/deployments", `[
+   {
+      "name":"cf-12345",
+      "releases":[
+         {
+            "name":"example_release",
+            "version":"2"
+         }
+      ],
+      "stemcells":[
+         {
+            "name":"example_stemcell",
+            "version":"1"
+         }
+      ]
+   }
+]`, ""},
+					{"GET", "/deployments/cf-12345/vms", `{"id":1,"state":"queued","description":"retrieve vm-stats","timestamp":1460639781,"result":"","user":"example_user"}`, fakeServer.URL + "/tasks/1"},
+					{"GET", "/tasks/1", `{"id":1,"state":"done","description":"retrieve vm-stats","timestamp":1460639781,"result":"","user":"example_user"}`, ""},
+					{"GET", "/tasks/1/output", `{"vm_cid":"11","ips":["30.30.30.30"],"agent_id":"11","job_name":"etcd_server-d284104a9345228c01e2","index":0}
+{"vm_cid":"2","ips":["31.31.31.31"],"agent_id":"2","job_name":"etcd_server-d284104a9345228c01e2","index":1}
+{"vm_cid":"6","ips":["32.32.32.32"],"agent_id":"6","job_name":"etcd_server-d284104a9345228c01e2","index":2}`, ""},
+				}, "basic")
 
-				transport := &http.Transport{
-					Proxy: func(req *http.Request) (*url.URL, error) {
-						return url.Parse(server.URL)
-					},
-					TLSClientConfig: &tls.Config{},
+				boshConfig := &gogobosh.Config{
+					Username:    "example_user",
+					Password:    "example_password",
+					BOSHAddress: fakeServer.URL,
 				}
-				httpClient := &http.Client{Transport: transport}
 
-				boshConfig := &bosh.Config{
-					Username:          "example_user",
-					Password:          "example_password",
-					BoshURI:           "bosh_uri.example.com",
-					Port:              "25555",
-					HTTPClient:        httpClient,
-					InsecureTransport: true,
-				}
-				boshClient := bosh.NewClient(boshConfig)
+				boshClient, _ := gogobosh.NewClient(boshConfig)
 
 				etcdServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.WriteHeader(200)
@@ -394,6 +304,10 @@ var _ = Describe("Contoller", func() {
 				mockRecorder = httptest.NewRecorder()
 			})
 
+			AfterEach(func() {
+				teardown()
+			})
+
 			It("returns a suitable json response", func() {
 				Ω(mockRecorder.Code).Should(Equal(200))
 				Expect(mockRecorder.Body.String()).Should(Equal(`{"healthy": false, "message": "Too many leaders"}`))
@@ -402,64 +316,38 @@ var _ = Describe("Contoller", func() {
 
 		Context("Not enough etcds are leaders", func() {
 			BeforeEach(func() {
-				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					if r.URL.String() == "http://bosh_uri.example.com:25555/deployments" {
-						w.WriteHeader(200)
-						w.Header().Set("Content-Type", "application/json")
-						fmt.Fprintln(w, `[
-		   {
-		      "name":"cf-12345",
-		      "releases":[
-		         {
-		            "name":"example_release",
-		            "version":"2"
-		         }
-		      ],
-		      "stemcells":[
-		         {
-		            "name":"example_stemcell",
-		            "version":"1"
-		         }
-		      ]
-		   }
-		]`)
-					} else if r.URL.String() == "http://bosh_uri.example.com:25555/deployments/cf-12345/vms?format=full" {
-						w.Header().Set("Content-Type", "application/json")
-						w.Header().Set("Location", "http://bosh_uri.example.com:25555/tasks/1")
-						w.WriteHeader(302)
-						fmt.Fprintln(w, `{"id":1,"state":"queued","description":"retrieve vm-stats","timestamp":1460639781,"result":"","user":"example_user"}`)
-					} else if r.URL.String() == "http://bosh_uri.example.com:25555/tasks/1" {
-						w.Header().Set("Content-Type", "application/json")
-						w.Header().Set("Location", "http://bosh_uri.example.com:25555/tasks/1/output?type=result")
-						w.WriteHeader(200)
-						// state must be "done" to prevent infinite loop
-						fmt.Fprintln(w, `{"id":1,"state":"done","description":"retrieve vm-stats","timestamp":1460639781,"result":"","user":"example_user"}`)
-					} else {
-						w.Header().Set("Content-Type", "application/json")
-						w.WriteHeader(200)
-						fmt.Fprintln(w, `{"vm_cid":"11","ips":["30.30.30.30"],"agent_id":"11","job_name":"etcd_server-d284104a9345228c01e2","index":0}
-		{"vm_cid":"2","ips":["31.31.31.31"],"agent_id":"2","job_name":"etcd_server-d284104a9345228c01e2","index":1}
-		{"vm_cid":"6","ips":["32.32.32.32"],"agent_id":"6","job_name":"etcd_server-d284104a9345228c01e2","index":2}`)
-					}
-				}))
+				setupMultiple([]MockRoute{
+					{"GET", "/deployments", `[
+   {
+      "name":"cf-12345",
+      "releases":[
+         {
+            "name":"example_release",
+            "version":"2"
+         }
+      ],
+      "stemcells":[
+         {
+            "name":"example_stemcell",
+            "version":"1"
+         }
+      ]
+   }
+]`, ""},
+					{"GET", "/deployments/cf-12345/vms", `{"id":1,"state":"queued","description":"retrieve vm-stats","timestamp":1460639781,"result":"","user":"example_user"}`, fakeServer.URL + "/tasks/1"},
+					{"GET", "/tasks/1", `{"id":1,"state":"done","description":"retrieve vm-stats","timestamp":1460639781,"result":"","user":"example_user"}`, ""},
+					{"GET", "/tasks/1/output", `{"vm_cid":"11","ips":["30.30.30.30"],"agent_id":"11","job_name":"etcd_server-d284104a9345228c01e2","index":0}
+{"vm_cid":"2","ips":["31.31.31.31"],"agent_id":"2","job_name":"etcd_server-d284104a9345228c01e2","index":1}
+{"vm_cid":"6","ips":["32.32.32.32"],"agent_id":"6","job_name":"etcd_server-d284104a9345228c01e2","index":2}`, ""},
+				}, "basic")
 
-				transport := &http.Transport{
-					Proxy: func(req *http.Request) (*url.URL, error) {
-						return url.Parse(server.URL)
-					},
-					TLSClientConfig: &tls.Config{},
+				boshConfig := &gogobosh.Config{
+					Username:    "example_user",
+					Password:    "example_password",
+					BOSHAddress: fakeServer.URL,
 				}
-				httpClient := &http.Client{Transport: transport}
 
-				boshConfig := &bosh.Config{
-					Username:          "example_user",
-					Password:          "example_password",
-					BoshURI:           "bosh_uri.example.com",
-					Port:              "25555",
-					HTTPClient:        httpClient,
-					InsecureTransport: true,
-				}
-				boshClient := bosh.NewClient(boshConfig)
+				boshClient, _ := gogobosh.NewClient(boshConfig)
 
 				etcdServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.WriteHeader(200)
@@ -479,6 +367,10 @@ var _ = Describe("Contoller", func() {
 				mockRecorder = httptest.NewRecorder()
 			})
 
+			AfterEach(func() {
+				teardown()
+			})
+
 			It("returns a suitable json response", func() {
 				Ω(mockRecorder.Code).Should(Equal(200))
 				Expect(mockRecorder.Body.String()).Should(Equal(`{"healthy": false, "message": "Not enough leaders"}`))
@@ -487,64 +379,38 @@ var _ = Describe("Contoller", func() {
 
 		Context("When etcds are healthy and clustered correctly", func() {
 			BeforeEach(func() {
-				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					if r.URL.String() == "http://bosh_uri.example.com:25555/deployments" {
-						w.WriteHeader(200)
-						w.Header().Set("Content-Type", "application/json")
-						fmt.Fprintln(w, `[
-		   {
-		      "name":"cf-12345",
-		      "releases":[
-		         {
-		            "name":"example_release",
-		            "version":"2"
-		         }
-		      ],
-		      "stemcells":[
-		         {
-		            "name":"example_stemcell",
-		            "version":"1"
-		         }
-		      ]
-		   }
-		]`)
-					} else if r.URL.String() == "http://bosh_uri.example.com:25555/deployments/cf-12345/vms?format=full" {
-						w.Header().Set("Content-Type", "application/json")
-						w.Header().Set("Location", "http://bosh_uri.example.com:25555/tasks/1")
-						w.WriteHeader(302)
-						fmt.Fprintln(w, `{"id":1,"state":"queued","description":"retrieve vm-stats","timestamp":1460639781,"result":"","user":"example_user"}`)
-					} else if r.URL.String() == "http://bosh_uri.example.com:25555/tasks/1" {
-						w.Header().Set("Content-Type", "application/json")
-						w.Header().Set("Location", "http://bosh_uri.example.com:25555/tasks/1/output?type=result")
-						w.WriteHeader(200)
-						// state must be "done" to prevent infinite loop
-						fmt.Fprintln(w, `{"id":1,"state":"done","description":"retrieve vm-stats","timestamp":1460639781,"result":"","user":"example_user"}`)
-					} else {
-						w.Header().Set("Content-Type", "application/json")
-						w.WriteHeader(200)
-						fmt.Fprintln(w, `{"vm_cid":"11","ips":["30.30.30.30"],"agent_id":"11","job_name":"etcd_server-d284104a9345228c01e2","index":0}
-		{"vm_cid":"2","ips":["31.31.31.31"],"agent_id":"2","job_name":"etcd_server-d284104a9345228c01e2","index":1}
-		{"vm_cid":"6","ips":["32.32.32.32"],"agent_id":"6","job_name":"etcd_server-d284104a9345228c01e2","index":2}`)
-					}
-				}))
+				setupMultiple([]MockRoute{
+					{"GET", "/deployments", `[
+   {
+      "name":"cf-12345",
+      "releases":[
+         {
+            "name":"example_release",
+            "version":"2"
+         }
+      ],
+      "stemcells":[
+         {
+            "name":"example_stemcell",
+            "version":"1"
+         }
+      ]
+   }
+]`, ""},
+					{"GET", "/deployments/cf-12345/vms", `{"id":1,"state":"queued","description":"retrieve vm-stats","timestamp":1460639781,"result":"","user":"example_user"}`, fakeServer.URL + "/tasks/1"},
+					{"GET", "/tasks/1", `{"id":1,"state":"done","description":"retrieve vm-stats","timestamp":1460639781,"result":"","user":"example_user"}`, ""},
+					{"GET", "/tasks/1/output", `{"vm_cid":"11","ips":["30.30.30.30"],"agent_id":"11","job_name":"etcd_server-d284104a9345228c01e2","index":0}
+{"vm_cid":"2","ips":["31.31.31.31"],"agent_id":"2","job_name":"etcd_server-d284104a9345228c01e2","index":1}
+{"vm_cid":"6","ips":["32.32.32.32"],"agent_id":"6","job_name":"etcd_server-d284104a9345228c01e2","index":2}`, ""},
+				}, "basic")
 
-				transport := &http.Transport{
-					Proxy: func(req *http.Request) (*url.URL, error) {
-						return url.Parse(server.URL)
-					},
-					TLSClientConfig: &tls.Config{},
+				boshConfig := &gogobosh.Config{
+					Username:    "example_user",
+					Password:    "example_password",
+					BOSHAddress: fakeServer.URL,
 				}
-				httpClient := &http.Client{Transport: transport}
 
-				boshConfig := &bosh.Config{
-					Username:          "example_user",
-					Password:          "example_password",
-					BoshURI:           "bosh_uri.example.com",
-					Port:              "25555",
-					HTTPClient:        httpClient,
-					InsecureTransport: true,
-				}
-				boshClient := bosh.NewClient(boshConfig)
+				boshClient, _ := gogobosh.NewClient(boshConfig)
 
 				etcdServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					if r.URL.String() == "http://30.30.30.30:4001/v2/stats/leader" {
@@ -568,6 +434,10 @@ var _ = Describe("Contoller", func() {
 
 				controller = webs.CreateController(boshClient, etcdHttpClient)
 				mockRecorder = httptest.NewRecorder()
+			})
+
+			AfterEach(func() {
+				teardown()
 			})
 
 			It("returns a suitable json response", func() {

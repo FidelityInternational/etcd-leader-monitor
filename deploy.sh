@@ -2,6 +2,7 @@
 
 set +x
 set -u
+set -e
 
 trap "rm security_group.json" EXIT
 
@@ -22,7 +23,7 @@ cat > security_group.json << EOF
   {
     "destination": "$CF_NETWORK",
     "protocol": "tcp",
-    "ports": "25555, 4001"
+    "ports": "25555, 4001, 8443"
   }
 ]
 EOF
