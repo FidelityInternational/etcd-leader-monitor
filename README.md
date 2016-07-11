@@ -17,10 +17,10 @@ If the incorrect number of etcd leaders or followers are found an appropriate re
 These JSON responses are intended to make it easy to integrate with a health monitoring dashboard to continously display the health of an etcd cluster.
 
 ### Prereqs:
-- This application communicates directly with bosh on port 25555 to get a list of etcd machine IPs
+- This application communicates directly with bosh on port 25555 (and 8443 to use UAA) to get a list of etcd machine IPs
 - This application makes http requests directly to the etcd nodes to find the etcd leader status.
 - Cloudfoundry container security groups are applied on a per-space basis.
-- You will need to ensure that your CF security-group rules permit communcation to bosh on port 25555 and all etcd vms on port 4001 for this applicaiton to function correctly
+- You will need to ensure that your CF security-group rules permit communcation to bosh on port 25555 and 8443 and all etcd vms on port 4001 for this applicaiton to function correctly
 
 ### Deployment
 
@@ -29,19 +29,18 @@ These JSON responses are intended to make it easy to integrate with a health mon
 ```
 cf target -o <my_org> -s <my_space>
 cf push --no-start
-cf set-env etcd-leader-monitor BOSH_USERNAME <BOSH_DIRECTOR_USERNAME>
-cf set-env etcd-leader-monitor BOSH_PASSWORD <BOSH_DIRECTOR_PASSWORD>
-cf set-env etcd-leader-monitor BOSH_URI <BOSH_DIRECTOR_PRIVATE_IP>
-cf set-env etcd-leader-monitor BOSH_PORT 25555
+cf set-env etcd-leader-monitor BOSH_USERNAME <BOSH_USERNAME>
+cf set-env etcd-leader-monitor BOSH_PASSWORD <BOSH_PASSWORD>
+cf set-env etcd-leader-monitor BOSH_URI <BOSH_URI>
 cf start etcd-leader-monitor
 ```
 
 #### Automated zero-downtime deployment
 
 ```
-BOSH_DIRECTOR_USERNAME=<username> \
-BOSH_DIRECTOR_PASSWORD=<password> \
-BOSH_DIRECTOR_PRIVATE_IP=<10.0.0.6> \
+BOSH_USERNAME=<username> \
+BOSH_PASSWORD=<password> \
+BOSH_URI=<https://10.0.0.6:25555> \
 CF_SYS_DOMAIN=<system.example.com> \
 CF_DEPLOY_USERNAME=<cf-username> \
 CF_DEPLOY_PASSWORD=<cf-password> \
