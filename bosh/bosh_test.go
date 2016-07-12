@@ -8,8 +8,10 @@ import (
 )
 
 var _ = Describe("#FindDeployment", func() {
-	It("Finds the first matching deployment name based on a regex", func() {
-		deployments := []Deployment{
+	var deployments []Deployment
+
+	BeforeEach(func() {
+		deployments = []Deployment{
 			{
 				Name:        "cf-warden-12345",
 				CloudConfig: "none",
@@ -43,7 +45,18 @@ var _ = Describe("#FindDeployment", func() {
 				},
 			},
 		}
-		Ω(bosh.FindDeployment(deployments, "cf-garden*")).Should(Equal("cf-garden-12345"))
+	})
+
+	Context("when a deployment can be found", func() {
+		It("finds the first matching deployment name based on a regex", func() {
+			Ω(bosh.FindDeployment(deployments, "cf-garden*")).Should(Equal("cf-garden-12345"))
+		})
+	})
+
+	Context("when a deployment cannot be found", func() {
+		It("returns an empty string", func() {
+			Ω(bosh.FindDeployment(deployments, "bosh*")).Should(BeEmpty())
+		})
 	})
 })
 
