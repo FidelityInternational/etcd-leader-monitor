@@ -33,10 +33,10 @@ func NewClient(config *Config) *Client {
 func (c *Client) GetLeaderStats() (bool, int, error) {
 	var etcdLeader etcdLeader
 	resp, err := c.Config.HTTPClient.Get(fmt.Sprintf("http://%s:4001/v2/stats/leader", c.Config.EtcdIP))
-	defer resp.Body.Close()
 	if err != nil {
 		return false, 0, err
 	}
+	defer resp.Body.Close()
 	data, err := ioutil.ReadAll(resp.Body)
 	err = json.Unmarshal(data, &etcdLeader)
 	if err != nil {
