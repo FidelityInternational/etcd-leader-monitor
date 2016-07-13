@@ -174,10 +174,6 @@
 			"Rev": "4e1c5567d7c2dd59fa4c7c83d34c2f3528b025d6"
 		},
 		{
-			"ImportPath": "github.com/srbry/gogobosh",
-			"Rev": "1132274f3ab962021b8e9dbde39d658b726c2695"
-		},
-		{
 			"ImportPath": "golang.org/x/net/context",
 			"Rev": "1aafd77e1e7f6849ad16a7bdeb65e3589a10b2bb"
 		},

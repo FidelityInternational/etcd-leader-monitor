@@ -2,9 +2,9 @@ package bosh_test
 
 import (
 	"github.com/FidelityInternational/etcd-leader-monitor/bosh"
+	. "github.com/cloudfoundry-community/gogobosh"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	. "github.com/srbry/gogobosh"
 )
 
 var _ = Describe("#FindDeployment", func() {

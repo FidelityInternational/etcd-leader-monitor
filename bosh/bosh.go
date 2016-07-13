@@ -1,7 +1,7 @@
 package bosh
 
 import (
-	"github.com/srbry/gogobosh"
+	"github.com/cloudfoundry-community/gogobosh"
 	"regexp"
 )
 

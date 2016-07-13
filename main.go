@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	webs "github.com/FidelityInternational/etcd-leader-monitor/web_server"
-	"github.com/srbry/gogobosh"
+	"github.com/cloudfoundry-community/gogobosh"
 	"net/http"
 	"os"
 )

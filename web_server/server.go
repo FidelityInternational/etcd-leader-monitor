@@ -1,8 +1,8 @@
 package webServer
 
 import (
+	"github.com/cloudfoundry-community/gogobosh"
 	"github.com/gorilla/mux"
-	"github.com/srbry/gogobosh"
 	"net/http"
 )
 

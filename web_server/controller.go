@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/FidelityInternational/etcd-leader-monitor/bosh"
 	"github.com/FidelityInternational/etcd-leader-monitor/etcd"
-	"github.com/srbry/gogobosh"
+	"github.com/cloudfoundry-community/gogobosh"
 	"net/http"
 )
 
