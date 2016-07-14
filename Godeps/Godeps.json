@@ -7,6 +7,11 @@
 	],
 	"Deps": [
 		{
+			"ImportPath": "github.com/caarlos0/env",
+			"Comment": "v2.0-21-g8030fe5",
+			"Rev": "8030fe5519ecb59ee38cb3c534b86dc868f23262"
+		},
+		{
 			"ImportPath": "github.com/cloudfoundry-community/gogobosh",
 			"Rev": "5d0392d69a5253b61b37f379eadccd204bc42173"
 		},
