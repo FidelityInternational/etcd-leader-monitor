@@ -2,16 +2,24 @@ package webServer
 
 import (
 	"fmt"
+	"net/http"
+
 	"github.com/FidelityInternational/etcd-leader-monitor/bosh"
 	"github.com/FidelityInternational/etcd-leader-monitor/etcd"
+	"github.com/caarlos0/env"
 	"github.com/cloudfoundry-community/gogobosh"
-	"net/http"
 )
 
 // Controller struct
 type Controller struct {
 	BoshClient     *gogobosh.Client
 	EtcdHTTPClient *http.Client
+}
+
+// Config struct
+type Config struct {
+	CfDeploymentName string `env:"CF_DEPLOYMENT_NAME" envDefault:"cf-"`
+	EtcdJobName      string `env:"ETCD_JOB_NAME" envDefault:"etcd_server"`
 }
 
 // CreateController - returns a populated controller object
@@ -40,7 +48,9 @@ func (c *Controller) CheckLeaders(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	deployment := bosh.FindDeployment(deployments, "^cf-.+")
+	deployconfig := Config{}
+	env.Parse(&deployconfig)
+	deployment := bosh.FindDeployment(deployments, fmt.Sprintf("^%s*", deployconfig.CfDeploymentName))
 	fmt.Println("Found deployment: ", deployment)
 	boshVMs, err := c.BoshClient.GetDeploymentVMs(deployment)
 	if err != nil {
@@ -49,7 +59,8 @@ func (c *Controller) CheckLeaders(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	etcdVMs := bosh.FindVMs(boshVMs, "^etcd_server.+$")
+
+	etcdVMs := bosh.FindVMs(boshVMs, fmt.Sprintf("^%s_.+$", deployconfig.EtcdJobName))
 	fmt.Println("Found Etcd VMs")
 	leaderList = make(map[string]map[bool]int)
 	for _, etcdVM := range etcdVMs {

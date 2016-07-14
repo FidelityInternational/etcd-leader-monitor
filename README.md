@@ -21,6 +21,7 @@ These JSON responses are intended to make it easy to integrate with a health mon
 - This application makes http requests directly to the etcd nodes to find the etcd leader status.
 - Cloudfoundry container security groups are applied on a per-space basis.
 - You will need to ensure that your CF security-group rules permit communcation to bosh on port 25555 and 8443 and all etcd vms on port 4001 for this applicaiton to function correctly
+- By default application expects cloudfoundry deployment name to start with "cf-" and etcd job name with "etcd_server", for custom config set environment variables as described in below manual deployment steps.
 
 ### Deployment
 
@@ -32,6 +33,8 @@ cf push --no-start
 cf set-env etcd-leader-monitor BOSH_USERNAME <BOSH_USERNAME>
 cf set-env etcd-leader-monitor BOSH_PASSWORD <BOSH_PASSWORD>
 cf set-env etcd-leader-monitor BOSH_URI <BOSH_URI>
+cf set-env etcd-leader-monitor CF_DEPLOYMENT_NAME <CF_DEPLOYMENT_NAME>
+cf set-env etcd-leader-monitor ETCD_JOB_NAME <ETCD_JOB_NAME>
 cf start etcd-leader-monitor
 ```
 
