@@ -16,13 +16,13 @@ var _ = Describe("#FindDeployment", func() {
 				Name:        "cf-warden-12345",
 				CloudConfig: "none",
 				Releases: []Resource{
-					Resource{
+					{
 						Name:    "cf",
 						Version: "223",
 					},
 				},
 				Stemcells: []Resource{
-					Resource{
+					{
 						Name:    "bosh-warden-boshlite-ubuntu-trusty-go_agent",
 						Version: "3126",
 					},
@@ -32,13 +32,13 @@ var _ = Describe("#FindDeployment", func() {
 				Name:        "cf-garden-12345",
 				CloudConfig: "none",
 				Releases: []Resource{
-					Resource{
+					{
 						Name:    "cf",
 						Version: "223",
 					},
 				},
 				Stemcells: []Resource{
-					Resource{
+					{
 						Name:    "bosh-warden-boshlite-ubuntu-trusty-go_agent",
 						Version: "3126",
 					},
