@@ -60,7 +60,7 @@ func (c *Controller) CheckLeaders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	etcdVMs := bosh.FindVMs(boshVMs, fmt.Sprintf("^%s_.+$", deployconfig.EtcdJobName))
+	etcdVMs := bosh.FindVMs(boshVMs, fmt.Sprintf("^%s*", deployconfig.EtcdJobName))
 	fmt.Println("Found Etcd VMs")
 	leaderList = make(map[string]map[bool]int)
 	for _, etcdVM := range etcdVMs {
