@@ -1,6 +1,5 @@
 #! /bin/bash
 
-set +x
 set -u
 set -e
 
@@ -32,8 +31,8 @@ if cf create-security-group etcd-leader-monitor security_group.json | grep -q "a
 fi
 cf bind-security-group etcd-leader-monitor etcd-leader-monitor etcd-leader-monitor
 echo "Deploying apps..."
-cf app etcd-leader-monitor > /dev/null 2>&1
-if [ $? -eq 0 ]; then
+
+if [[ "$(cf app etcd-leader-monitor) || true)" == *"FAILED"* ]] ; then
   echo "Zero downtime deploying etcd-leader-monitor..."
   domain=$(cf app etcd-leader-monitor | grep urls | cut -d":" -f2 | xargs | cut -d"." -f 2-)
   cf push etcd-leader-monitor-green -f manifest.yml -n etcd-leader-monitor-green --no-start
