@@ -73,6 +73,38 @@ type VM struct {
 	IPs               []string `json:"ips"`
 	DNS               []string `json:"dns"`
 	ResurectionPaused bool     `json:"resurrection_paused"`
+	Vitals            Vitals   `json:"vitals"`
+}
+
+// VM Vitals struct
+type Vitals struct {
+	Disk Disk     `json:"disk"`
+	Load []string `json:"load"`
+	Mem  Memory   `json:"mem"`
+	Swap Memory   `json:"swap"`
+	CPU  CPU      `json:"cpu"`
+}
+type Disk struct {
+	Ephemeral DiskStats `json:"ephemeral"`
+	System    DiskStats `json:"system"`
+}
+
+type CPU struct {
+	Sys  string `json:"sys"`
+	User string `json:"user"`
+	Wait string `json:"wait"`
+}
+
+// Disk struct
+type DiskStats struct {
+	Percent      string `json:"percent"`
+	InodePercent string `json:"inode_percent"`
+}
+
+// Memory struct
+type Memory struct {
+	Percent string `json:"percent"`
+	KB      string `json:"KB"`
 }
 
 // Task struct

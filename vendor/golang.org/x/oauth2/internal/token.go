@@ -146,23 +146,23 @@ func providerAuthHeaderWorks(tokenURL string) bool {
 	return true
 }
 
-func RetrieveToken(ctx context.Context, ClientID, ClientSecret, TokenURL string, v url.Values) (*Token, error) {
+func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string, v url.Values) (*Token, error) {
 	hc, err := ContextClient(ctx)
 	if err != nil {
 		return nil, err
 	}
-	v.Set("client_id", ClientID)
-	bustedAuth := !providerAuthHeaderWorks(TokenURL)
-	if bustedAuth && ClientSecret != "" {
-		v.Set("client_secret", ClientSecret)
+	v.Set("client_id", clientID)
+	bustedAuth := !providerAuthHeaderWorks(tokenURL)
+	if bustedAuth && clientSecret != "" {
+		v.Set("client_secret", clientSecret)
 	}
-	req, err := http.NewRequest("POST", TokenURL, strings.NewReader(v.Encode()))
+	req, err := http.NewRequest("POST", tokenURL, strings.NewReader(v.Encode()))
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	if !bustedAuth {
-		req.SetBasicAuth(ClientID, ClientSecret)
+		req.SetBasicAuth(clientID, clientSecret)
 	}
 	r, err := hc.Do(req)
 	if err != nil {
@@ -174,6 +174,11 @@ func RetrieveToken(ctx context.Context, ClientID, ClientSecret, TokenURL string,
 		return nil, fmt.Errorf("oauth2: cannot fetch token: %v", err)
 	}
 	if code := r.StatusCode; code < 200 || code > 299 {
+		fmt.Println("Something went wrong and I am trying to find out why:")
+		fmt.Println("Was auth busted? ", bustedAuth)
+		fmt.Println("My status code was:", r.Status)
+		fmt.Printf("Response Body was: %s\n", body)
+		fmt.Printf("My request looked like: %+v\n", req)
 		return nil, fmt.Errorf("oauth2: cannot fetch token: %v\nResponse: %s", r.Status, body)
 	}
 
@@ -214,6 +219,8 @@ func RetrieveToken(ctx context.Context, ClientID, ClientSecret, TokenURL string,
 			Expiry:       tj.expiry(),
 			Raw:          make(map[string]interface{}),
 		}
+		fmt.Println("My token object was:")
+		fmt.Printf("%+v\n", token)
 		json.Unmarshal(body, &token.Raw) // no error checks for optional fields
 	}
 	// Don't overwrite `RefreshToken` with an empty value
