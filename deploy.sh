@@ -17,15 +17,26 @@ cf create-space etcd-leader-monitor
 echo "Targetting Space etcd-leader-monitor..."
 cf target -s etcd-leader-monitor
 echo "Setting up security groups..."
-cat > security_group.json << EOF
-[
+echo "[" > security_group.json
+last_subnet=$(echo "${CF_NETWORKS}" | awk -F, '{print $NF}')
+for subnet in ${CF_NETWORKS//,/ } ;
+do
+cat >> security_group.json << EOF
   {
-    "destination": "$CF_NETWORK",
+    "destination": "$subnet",
     "protocol": "tcp",
     "ports": "25555, 4001, 8443"
-  }
-]
 EOF
+if [ "${subnet}" != "${last_subnet}" ];
+then
+  echo "  }," >> security_group.json
+else
+  echo "  }" >> security_group.json
+fi
+
+done
+echo "]" >> security_group.json
+
 if cf create-security-group etcd-leader-monitor security_group.json | grep -q "already exists"; then
   cf update-security-group etcd-leader-monitor security_group.json
 fi

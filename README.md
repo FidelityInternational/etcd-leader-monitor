@@ -47,7 +47,7 @@ BOSH_URI=<https://10.0.0.6:25555> \
 CF_SYS_DOMAIN=<system.example.com> \
 CF_DEPLOY_USERNAME=<cf-username> \
 CF_DEPLOY_PASSWORD=<cf-password> \
-CF_NETWORK=<10.0.0.0/24> \
+CF_NETWORKS=<10.0.0.0/24,11.0.0.0/24> \
 ./deploy.sh
 ```
 
