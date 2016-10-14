@@ -17,6 +17,12 @@ cf create-space etcd-leader-monitor
 echo "Targetting Space etcd-leader-monitor..."
 cf target -s etcd-leader-monitor
 echo "Setting up security groups..."
+if [ -z "${CF_NETWORKS}" ]; then
+# Disable this shellcheck warning as we know how to spell correctly.
+# shellcheck disable=SC2153
+CF_NETWORKS="${CF_NETWORK}"
+fi
+
 echo "[" > security_group.json
 last_subnet=$(echo "${CF_NETWORKS}" | awk -F, '{print $NF}')
 for subnet in ${CF_NETWORKS//,/ } ;
