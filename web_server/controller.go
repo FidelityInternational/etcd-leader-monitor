@@ -1,13 +1,14 @@
 package webServer
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
-	"net/http"
-
 	"github.com/FidelityInternational/etcd-leader-monitor/bosh"
 	"github.com/FidelityInternational/etcd-leader-monitor/etcd"
 	"github.com/caarlos0/env"
 	"github.com/cloudfoundry-community/gogobosh"
+	"net/http"
 )
 
 // Controller struct
@@ -18,8 +19,10 @@ type Controller struct {
 
 // Config struct
 type Config struct {
-	CfDeploymentName string `env:"CF_DEPLOYMENT_NAME" envDefault:"cf-"`
-	EtcdJobName      string `env:"ETCD_JOB_NAME" envDefault:"etcd_server"`
+	CfDeploymentName    string `env:"CF_DEPLOYMENT_NAME" envDefault:"cf-"`
+	EtcdJobName         string `env:"ETCD_JOB_NAME" envDefault:"etcd_server"`
+	SSLEnabled          bool   `env:"SSL_ENABLED" envDefault:false`
+	SkipSSLVerification bool   `env:"SKIP_SSL_VERIFICATION" envDefault:false`
 }
 
 // CreateController - returns a populated controller object
@@ -37,10 +40,11 @@ func (c *Controller) CheckLeaders(w http.ResponseWriter, r *http.Request) {
 		leaderList          map[string]map[bool]int
 		leaderCount         int
 		httpResponseMessage string
+		etcdProtocol        = `http`
 	)
 
 	fmt.Println("Checking Leaders...")
-	fmt.Println("Fetching Etcd IPs from BOSH...")
+	fmt.Println("Fetching Bosh deployment...")
 	deployments, err := c.BoshClient.GetDeployments()
 	if err != nil {
 		fmt.Println("An error occured:")
@@ -52,6 +56,37 @@ func (c *Controller) CheckLeaders(w http.ResponseWriter, r *http.Request) {
 	env.Parse(&deployconfig)
 	deployment := bosh.FindDeployment(deployments, fmt.Sprintf("^%s*", deployconfig.CfDeploymentName))
 	fmt.Println("Found deployment: ", deployment)
+	if deployconfig.SSLEnabled {
+		fmt.Println("Fetching Etcd Certs...")
+		etcdProtocol = "https"
+		boshDeployment, err := c.BoshClient.GetDeployment(deployment)
+		if err != nil {
+			fmt.Println("An error occured:")
+			fmt.Println(err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		etcdCerts := bosh.GetEtcdCerts(boshDeployment.Manifest, fmt.Sprintf("^%s*", deployconfig.EtcdJobName))
+		caCert := x509.NewCertPool()
+		caCert.AppendCertsFromPEM([]byte(etcdCerts.CaCert))
+		clientCert, err := tls.X509KeyPair([]byte(etcdCerts.ClientCert), []byte(etcdCerts.ClientKey))
+		if err != nil {
+			fmt.Println("An error occured:")
+			fmt.Println(err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		tlsConfig := &tls.Config{
+			RootCAs:            caCert,
+			Certificates:       []tls.Certificate{clientCert},
+			InsecureSkipVerify: deployconfig.SkipSSLVerification,
+		}
+		tr := &http.Transport{
+			TLSClientConfig: tlsConfig,
+		}
+		c.EtcdHTTPClient.Transport = tr
+	}
+	fmt.Println("Fetching Etcd IPs from BOSH...")
 	boshVMs, err := c.BoshClient.GetDeploymentVMs(deployment)
 	if err != nil {
 		fmt.Println("An error occured:")
@@ -59,14 +94,14 @@ func (c *Controller) CheckLeaders(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-
 	etcdVMs := bosh.FindVMs(boshVMs, fmt.Sprintf("^%s*", deployconfig.EtcdJobName))
 	fmt.Println("Found Etcd VMs")
 	leaderList = make(map[string]map[bool]int)
 	for _, etcdVM := range etcdVMs {
 		etcdConfig := &etcd.Config{
-			EtcdIP:     etcdVM.IPs[0],
-			HTTPClient: c.EtcdHTTPClient,
+			EtcdIP:       etcdVM.IPs[0],
+			HTTPClient:   c.EtcdHTTPClient,
+			EtcdProtocol: etcdProtocol,
 		}
 		etcdClient := etcd.NewClient(etcdConfig)
 		leader, followers, err := etcdClient.GetLeaderStats()

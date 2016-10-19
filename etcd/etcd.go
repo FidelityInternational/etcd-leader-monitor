@@ -9,8 +9,9 @@ import (
 
 // Config - used for configration of Client
 type Config struct {
-	EtcdIP     string
-	HTTPClient *http.Client
+	EtcdIP       string
+	HTTPClient   *http.Client
+	EtcdProtocol string
 }
 
 // Client - used to communicate with Etcd
@@ -32,7 +33,7 @@ func NewClient(config *Config) *Client {
 // GetLeaderStats - returns leader true/false and count of followers
 func (c *Client) GetLeaderStats() (bool, int, error) {
 	var etcdLeader etcdLeader
-	resp, err := c.Config.HTTPClient.Get(fmt.Sprintf("http://%s:4001/v2/stats/leader", c.Config.EtcdIP))
+	resp, err := c.Config.HTTPClient.Get(fmt.Sprintf("%s://%s:4001/v2/stats/leader", c.Config.EtcdProtocol, c.Config.EtcdIP))
 	if err != nil {
 		return false, 0, err
 	}
