@@ -2,8 +2,42 @@ package bosh
 
 import (
 	"github.com/cloudfoundry-community/gogobosh"
+	"gopkg.in/yaml.v2"
 	"regexp"
 )
+
+type manifest struct {
+	Jobs []jobs `yaml:"jobs"`
+}
+
+type jobs struct {
+	Name       string                  `yaml:"name"`
+	Properties diegoDatabaseProperties `yaml:"properties"`
+}
+
+type diegoDatabaseProperties struct {
+	Etcd EtcdCerts `yaml:"etcd"`
+}
+
+// EtcdCerts - A struct that defines the required certs for SSL secured etcd
+type EtcdCerts struct {
+	ClientKey  string `yaml:"client_key"`
+	ClientCert string `yaml:"client_cert"`
+	CaCert     string `yaml:"ca_cert"`
+}
+
+// GetEtcdCerts - Returns Client Key/Cert and CaCert that could be used for SSL secured etcd
+func GetEtcdCerts(deploymentManifest string, jobRegex string) EtcdCerts {
+	var deployManifest manifest
+	yaml.Unmarshal([]byte(deploymentManifest), &deployManifest)
+	for _, job := range deployManifest.Jobs {
+		matched, _ := regexp.MatchString(jobRegex, job.Name)
+		if matched {
+			return job.Properties.Etcd
+		}
+	}
+	return EtcdCerts{}
+}
 
 // FindDeployment - takes deployments and a regex to return the first matching deployment name
 func FindDeployment(deployments []gogobosh.Deployment, regex string) string {

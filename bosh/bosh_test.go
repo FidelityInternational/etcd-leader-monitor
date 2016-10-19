@@ -7,6 +7,56 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+var _ = Describe("#GetEtcdCerts", func() {
+	var manifest string
+
+	BeforeEach(func() {
+		manifest = `---
+jobs:
+- name: test-job1
+  properties:
+    etcd:
+      ca_cert : |
+        -----BEGIN CERTIFICATE-----
+        IAmAFakeCACert
+        -----END CERTIFICATE-----
+      client_cert: |
+        -----BEGIN CERTIFICATE-----
+        IAmAFakeClientCert
+        -----END CERTIFICATE-----
+      client_key: |
+        -----BEGIN RSA PRIVATE KEY-----
+        IAmAFakeClientKey
+        -----END RSA PRIVATE KEY-----
+`
+	})
+
+	Context("when the job does not match the regex", func() {
+		It("returns an empty certs object", func() {
+			certs := bosh.GetEtcdCerts(manifest, "not-matching")
+			Ω(certs).Should(Equal(bosh.EtcdCerts{}))
+		})
+
+		Context("when the job does match the regex", func() {
+			It("returns the certs object for the first regex matched job", func() {
+				certs := bosh.GetEtcdCerts(manifest, "^test-job.*")
+				Ω(certs.CaCert).Should(Equal(`-----BEGIN CERTIFICATE-----
+IAmAFakeCACert
+-----END CERTIFICATE-----
+`))
+				Ω(certs.ClientCert).Should(Equal(`-----BEGIN CERTIFICATE-----
+IAmAFakeClientCert
+-----END CERTIFICATE-----
+`))
+				Ω(certs.ClientKey).Should(Equal(`-----BEGIN RSA PRIVATE KEY-----
+IAmAFakeClientKey
+-----END RSA PRIVATE KEY-----
+`))
+			})
+		})
+	})
+})
+
 var _ = Describe("#FindDeployment", func() {
 	var deployments []Deployment
 
