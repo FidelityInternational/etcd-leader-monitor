@@ -35,13 +35,7 @@ func CreateController(boshClient *gogobosh.Client, etcdHTTPClient *http.Client) 
 
 // CheckLeaders - checks if leaders are in a healthy state
 func (c *Controller) CheckLeaders(w http.ResponseWriter, r *http.Request) {
-	var (
-		leaderInfo          map[bool]int
-		leaderList          map[string]map[bool]int
-		leaderCount         int
-		httpResponseMessage string
-		etcdProtocol        = `http`
-	)
+	var etcdProtocol = `http`
 
 	fmt.Println("Checking Leaders...")
 	fmt.Println("Fetching Bosh deployment...")
@@ -55,30 +49,12 @@ func (c *Controller) CheckLeaders(w http.ResponseWriter, r *http.Request) {
 	deployment := bosh.FindDeployment(deployments, fmt.Sprintf("^%s*", deployconfig.CfDeploymentName))
 	fmt.Println("Found deployment: ", deployment)
 	if deployconfig.SSLEnabled {
-		fmt.Println("Fetching Etcd Certs...")
 		etcdProtocol = "https"
-		boshDeployment, err := c.BoshClient.GetDeployment(deployment)
+		err = c.LoadCerts(deployconfig, deployment)
 		if err != nil {
 			errorPrint(err, w)
 			return
 		}
-		etcdCerts := bosh.GetEtcdCerts(boshDeployment.Manifest, fmt.Sprintf("^%s*", deployconfig.EtcdJobName))
-		caCert := x509.NewCertPool()
-		caCert.AppendCertsFromPEM([]byte(etcdCerts.CaCert))
-		clientCert, err := tls.X509KeyPair([]byte(etcdCerts.ClientCert), []byte(etcdCerts.ClientKey))
-		if err != nil {
-			errorPrint(err, w)
-			return
-		}
-		tlsConfig := &tls.Config{
-			RootCAs:            caCert,
-			Certificates:       []tls.Certificate{clientCert},
-			InsecureSkipVerify: deployconfig.SkipSSLVerification,
-		}
-		tr := &http.Transport{
-			TLSClientConfig: tlsConfig,
-		}
-		c.EtcdHTTPClient.Transport = tr
 	}
 	fmt.Println("Fetching Etcd IPs from BOSH...")
 	boshVMs, err := c.BoshClient.GetDeploymentVMs(deployment)
@@ -88,6 +64,63 @@ func (c *Controller) CheckLeaders(w http.ResponseWriter, r *http.Request) {
 	}
 	etcdVMs := bosh.FindVMs(boshVMs, fmt.Sprintf("^%s*", deployconfig.EtcdJobName))
 	fmt.Println("Found Etcd VMs")
+	httpResponseMessage, err := c.etcdProcess(etcdVMs, etcdProtocol, w)
+	if err != nil {
+		errorPrint(err, w)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, httpResponseMessage)
+}
+
+// LoadCerts - downloads certs from BOSH and configures the EtcdHTTPClient appropriately
+func (c *Controller) LoadCerts(deployconfig Config, deployment string) error {
+	fmt.Println("Fetching Etcd Certs...")
+	boshDeployment, err := c.BoshClient.GetDeployment(deployment)
+	if err != nil {
+		return err
+	}
+	etcdCerts := bosh.GetEtcdCerts(boshDeployment.Manifest, fmt.Sprintf("^%s*", deployconfig.EtcdJobName))
+	if etcdCerts.ClientKey == "" {
+		return fmt.Errorf("Etcd Client Key was blank")
+	}
+	if etcdCerts.ClientCert == "" {
+		return fmt.Errorf("Etcd Client Cert was blank")
+	}
+	caCert := x509.NewCertPool()
+	if !deployconfig.SkipSSLVerification {
+		if etcdCerts.CaCert == "" {
+			return fmt.Errorf("Etcd CA Cert was blank")
+		}
+		if !caCert.AppendCertsFromPEM([]byte(etcdCerts.CaCert)) {
+			return fmt.Errorf("Could not add CA Cert, CA Cert was likely invalid")
+		}
+	}
+	clientCert, err := tls.X509KeyPair([]byte(etcdCerts.ClientCert), []byte(etcdCerts.ClientKey))
+	if err != nil {
+		return err
+	}
+	tlsConfig := &tls.Config{
+		RootCAs:            caCert,
+		Certificates:       []tls.Certificate{clientCert},
+		InsecureSkipVerify: deployconfig.SkipSSLVerification,
+	}
+	tr := &http.Transport{
+		TLSClientConfig: tlsConfig,
+	}
+	c.EtcdHTTPClient.Transport = tr
+	return nil
+}
+
+func (c *Controller) etcdProcess(etcdVMs []gogobosh.VM, etcdProtocol string, w http.ResponseWriter) (string, error) {
+	var (
+		leaderInfo          map[bool]int
+		leaderList          map[string]map[bool]int
+		leaderCount         int
+		httpResponseMessage string
+	)
+
 	leaderList = make(map[string]map[bool]int)
 	for _, etcdVM := range etcdVMs {
 		etcdConfig := &etcd.Config{
@@ -98,8 +131,7 @@ func (c *Controller) CheckLeaders(w http.ResponseWriter, r *http.Request) {
 		etcdClient := etcd.NewClient(etcdConfig)
 		leader, followers, err := etcdClient.GetLeaderStats()
 		if err != nil {
-			errorPrint(err, w)
-			return
+			return "", err
 		}
 		leaderInfo = make(map[bool]int)
 		leaderInfo[leader] = followers
@@ -124,9 +156,7 @@ func (c *Controller) CheckLeaders(w http.ResponseWriter, r *http.Request) {
 	} else if httpResponseMessage == "" {
 		httpResponseMessage = `{"healthy": true, "message": "Everything is healthy"}`
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, httpResponseMessage)
+	return httpResponseMessage, nil
 }
 
 func errorPrint(err error, w http.ResponseWriter) {
