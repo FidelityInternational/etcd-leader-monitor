@@ -29,8 +29,9 @@ var _ = Describe("#GetLeaderStats", func() {
 
 		BeforeEach(func() {
 			config := &etcd.Config{
-				EtcdIP:     "1.1.1.1:1",
-				HTTPClient: &http.Client{},
+				EtcdIP:       "1.1.1.1:1",
+				HTTPClient:   &http.Client{},
+				EtcdProtocol: "http",
 			}
 			client = etcd.NewClient(config)
 		})
@@ -60,8 +61,9 @@ var _ = Describe("#GetLeaderStats", func() {
 			httpClient := &http.Client{Transport: transport}
 
 			config := &etcd.Config{
-				EtcdIP:     "1.1.1.1",
-				HTTPClient: httpClient,
+				EtcdIP:       "1.1.1.1",
+				HTTPClient:   httpClient,
+				EtcdProtocol: "http",
 			}
 			client = etcd.NewClient(config)
 		})
@@ -92,8 +94,9 @@ var _ = Describe("#GetLeaderStats", func() {
 				httpClient := &http.Client{Transport: transport}
 
 				config := &etcd.Config{
-					EtcdIP:     "1.1.1.1",
-					HTTPClient: httpClient,
+					EtcdIP:       "1.1.1.1",
+					HTTPClient:   httpClient,
+					EtcdProtocol: "http",
 				}
 				client = etcd.NewClient(config)
 			})
@@ -124,8 +127,9 @@ var _ = Describe("#GetLeaderStats", func() {
 				httpClient := &http.Client{Transport: transport}
 
 				config := &etcd.Config{
-					EtcdIP:     "1.1.1.1",
-					HTTPClient: httpClient,
+					EtcdIP:       "1.1.1.1",
+					HTTPClient:   httpClient,
+					EtcdProtocol: "http",
 				}
 				client = etcd.NewClient(config)
 			})

@@ -47,9 +47,7 @@ func (c *Controller) CheckLeaders(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Fetching Bosh deployment...")
 	deployments, err := c.BoshClient.GetDeployments()
 	if err != nil {
-		fmt.Println("An error occured:")
-		fmt.Println(err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
+		errorPrint(err, w)
 		return
 	}
 	deployconfig := Config{}
@@ -61,9 +59,7 @@ func (c *Controller) CheckLeaders(w http.ResponseWriter, r *http.Request) {
 		etcdProtocol = "https"
 		boshDeployment, err := c.BoshClient.GetDeployment(deployment)
 		if err != nil {
-			fmt.Println("An error occured:")
-			fmt.Println(err.Error())
-			w.WriteHeader(http.StatusInternalServerError)
+			errorPrint(err, w)
 			return
 		}
 		etcdCerts := bosh.GetEtcdCerts(boshDeployment.Manifest, fmt.Sprintf("^%s*", deployconfig.EtcdJobName))
@@ -71,9 +67,7 @@ func (c *Controller) CheckLeaders(w http.ResponseWriter, r *http.Request) {
 		caCert.AppendCertsFromPEM([]byte(etcdCerts.CaCert))
 		clientCert, err := tls.X509KeyPair([]byte(etcdCerts.ClientCert), []byte(etcdCerts.ClientKey))
 		if err != nil {
-			fmt.Println("An error occured:")
-			fmt.Println(err.Error())
-			w.WriteHeader(http.StatusInternalServerError)
+			errorPrint(err, w)
 			return
 		}
 		tlsConfig := &tls.Config{
@@ -89,9 +83,7 @@ func (c *Controller) CheckLeaders(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Fetching Etcd IPs from BOSH...")
 	boshVMs, err := c.BoshClient.GetDeploymentVMs(deployment)
 	if err != nil {
-		fmt.Println("An error occured:")
-		fmt.Println(err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
+		errorPrint(err, w)
 		return
 	}
 	etcdVMs := bosh.FindVMs(boshVMs, fmt.Sprintf("^%s*", deployconfig.EtcdJobName))
@@ -106,9 +98,7 @@ func (c *Controller) CheckLeaders(w http.ResponseWriter, r *http.Request) {
 		etcdClient := etcd.NewClient(etcdConfig)
 		leader, followers, err := etcdClient.GetLeaderStats()
 		if err != nil {
-			fmt.Println("An error occured:")
-			fmt.Println(err.Error())
-			w.WriteHeader(http.StatusInternalServerError)
+			errorPrint(err, w)
 			return
 		}
 		leaderInfo = make(map[bool]int)
@@ -137,4 +127,12 @@ func (c *Controller) CheckLeaders(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, httpResponseMessage)
+}
+
+func errorPrint(err error, w http.ResponseWriter) {
+	if err != nil {
+		fmt.Println("An error occured:")
+		fmt.Println(err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+	}
 }
