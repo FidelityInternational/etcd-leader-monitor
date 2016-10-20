@@ -1,13 +1,31 @@
 #! /bin/bash
 
-set -u
 set -e
 
 trap "rm security_group.json" EXIT
 
+setEnvs () {
+  cf set-env "$1" BOSH_USERNAME "${BOSH_USERNAME}"
+  cf set-env "$1" BOSH_PASSWORD "${BOSH_PASSWORD}"
+  cf set-env "$1" BOSH_URI "${BOSH_URI}"
+  cf set-env "$1" BOSH_PORT 25555
+  if [ -n "${CF_DEPLOYMENT_NAME}" ]; then
+    cf set-env "$1" CF_DEPLOYMENT_NAME "${CF_DEPLOYMENT_NAME}"
+  fi
+  if [ -n "${ETCD_JOB_NAME}" ]; then
+    cf set-env "$1" ETCD_JOB_NAME "${ETCD_JOB_NAME}"
+  fi
+  if [ -n "${SSL_ENABLED}" ]; then
+    cf set-env "$1" SSL_ENABLED "${SSL_ENABLED}"
+  fi
+  if [ -n "${SKIP_SSL_VERIFICATION}" ]; then
+    cf set-env "$1" SKIP_SSL_VERIFICATION "${SKIP_SSL_VERIFICATION}"
+  fi
+}
+
 echo "Logging into CF..."
-cf api https://api."$CF_SYS_DOMAIN" --skip-ssl-validation
-cf auth "$CF_DEPLOY_USERNAME" "$CF_DEPLOY_PASSWORD"
+cf api https://api."${CF_SYS_DOMAIN}" --skip-ssl-validation
+cf auth "${CF_DEPLOY_USERNAME}" "${CF_DEPLOY_PASSWORD}"
 echo "Creating Org etcd-leader-monitor..."
 cf create-org etcd-leader-monitor
 echo "Targetting Org etcd-leader-monitor..."
@@ -50,23 +68,17 @@ cf bind-security-group etcd-leader-monitor etcd-leader-monitor etcd-leader-monit
 echo "Deploying apps..."
 
 if [[ "$(cf app etcd-leader-monitor) || true)" == *"FAILED"* ]] ; then
-  cf push --no-start
-  cf set-env etcd-leader-monitor BOSH_USERNAME "$BOSH_USERNAME"
-  cf set-env etcd-leader-monitor BOSH_PASSWORD "$BOSH_PASSWORD"
-  cf set-env etcd-leader-monitor BOSH_URI "$BOSH_URI"
-  cf set-env etcd-leader-monitor BOSH_PORT 25555
-  cf start etcd-leader-monitor
+  cf push "${APP_NAME:-etcd-leader-monitor}" --no-start
+  setEnvs "${APP_NAME:-etcd-leader-monitor}"
+  cf start "${APP_NAME:-etcd-leader-monitor}"
 else
   echo "Zero downtime deploying etcd-leader-monitor..."
   domain=$(cf app etcd-leader-monitor | grep urls | cut -d":" -f2 | xargs | cut -d"." -f 2-)
-  cf push etcd-leader-monitor-green -f manifest.yml -n etcd-leader-monitor-green --no-start
-  cf set-env etcd-leader-monitor-green BOSH_USERNAME "$BOSH_USERNAME"
-  cf set-env etcd-leader-monitor-green BOSH_PASSWORD "$BOSH_PASSWORD"
-  cf set-env etcd-leader-monitor-green BOSH_URI "$BOSH_URI"
-  cf set-env etcd-leader-monitor-green BOSH_PORT 25555
-  cf start etcd-leader-monitor-green
-  cf map-route etcd-leader-monitor-green "$domain" -n etcd-leader-monitor
-  cf delete etcd-leader-monitor -f
-  cf rename etcd-leader-monitor-green etcd-leader-monitor
-  cf unmap-route etcd-leader-monitor "$domain" -n etcd-leader-monitor-green
+  cf push "${APP_NAME:-etcd-leader-monitor}-green" -f manifest.yml -n "${APP_NAME:-etcd-leader-monitor}-green" --no-start
+  setEnvs "${APP_NAME:-etcd-leader-monitor}-green"
+  cf start "${APP_NAME:-etcd-leader-monitor}-green"
+  cf map-route "${APP_NAME:-etcd-leader-monitor}-green" "${domain}" -n "${APP_NAME:-etcd-leader-monitor}"
+  cf delete "${APP_NAME:-etcd-leader-monitor}" -f
+  cf rename "${APP_NAME:-etcd-leader-monitor}-green" "${APP_NAME:-etcd-leader-monitor}"
+  cf unmap-route "${APP_NAME:-etcd-leader-monitor}" "${domain}" -n "${APP_NAME:-etcd-leader-monitor}-green"
 fi
