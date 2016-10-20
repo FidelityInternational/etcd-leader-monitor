@@ -21,8 +21,8 @@ type Controller struct {
 type Config struct {
 	CfDeploymentName    string `env:"CF_DEPLOYMENT_NAME" envDefault:"cf-"`
 	EtcdJobName         string `env:"ETCD_JOB_NAME" envDefault:"etcd_server"`
-	SSLEnabled          bool   `env:"SSL_ENABLED" envDefault:false`
-	SkipSSLVerification bool   `env:"SKIP_SSL_VERIFICATION" envDefault:false`
+	SSLEnabled          bool   `env:"SSL_ENABLED" envDefault:"false"`
+	SkipSSLVerification bool   `env:"SKIP_SSL_VERIFICATION" envDefault:"false"`
 }
 
 // CreateController - returns a populated controller object
@@ -161,7 +161,7 @@ func (c *Controller) etcdProcess(etcdVMs []gogobosh.VM, etcdProtocol string, w h
 
 func errorPrint(err error, w http.ResponseWriter) {
 	if err != nil {
-		fmt.Println("An error occured:")
+		fmt.Println("An error occurred:")
 		fmt.Println(err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 	}
