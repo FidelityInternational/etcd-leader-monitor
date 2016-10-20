@@ -28,28 +28,17 @@ var _ = Describe("#GetLeaderStats", func() {
 		var client *etcd.Client
 
 		BeforeEach(func() {
-			server := httptest.NewServer((http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(1)
-			})))
-
-			transport := &http.Transport{
-				Proxy: func(req *http.Request) (*url.URL, error) {
-					return url.Parse(server.URL)
-				},
-				TLSClientConfig: &tls.Config{},
-			}
-			httpClient := &http.Client{Transport: transport}
-
 			config := &etcd.Config{
-				EtcdIP:     "1.1.1.1",
-				HTTPClient: httpClient,
+				EtcdIP:       "1.1.1.1:1",
+				HTTPClient:   &http.Client{},
+				EtcdProtocol: "http",
 			}
 			client = etcd.NewClient(config)
 		})
 
 		It("returns the error", func() {
 			_, _, err := client.GetLeaderStats()
-			Ω(err).Should(MatchError(`Get http://1.1.1.1:4001/v2/stats/leader: malformed HTTP status code "1"`))
+			Ω(err).Should(MatchError(`Get http://1.1.1.1:1:4001/v2/stats/leader: dial tcp: too many colons in address 1.1.1.1:1:4001`))
 		})
 	})
 
@@ -72,8 +61,9 @@ var _ = Describe("#GetLeaderStats", func() {
 			httpClient := &http.Client{Transport: transport}
 
 			config := &etcd.Config{
-				EtcdIP:     "1.1.1.1",
-				HTTPClient: httpClient,
+				EtcdIP:       "1.1.1.1",
+				HTTPClient:   httpClient,
+				EtcdProtocol: "http",
 			}
 			client = etcd.NewClient(config)
 		})
@@ -104,8 +94,9 @@ var _ = Describe("#GetLeaderStats", func() {
 				httpClient := &http.Client{Transport: transport}
 
 				config := &etcd.Config{
-					EtcdIP:     "1.1.1.1",
-					HTTPClient: httpClient,
+					EtcdIP:       "1.1.1.1",
+					HTTPClient:   httpClient,
+					EtcdProtocol: "http",
 				}
 				client = etcd.NewClient(config)
 			})
@@ -136,8 +127,9 @@ var _ = Describe("#GetLeaderStats", func() {
 				httpClient := &http.Client{Transport: transport}
 
 				config := &etcd.Config{
-					EtcdIP:     "1.1.1.1",
-					HTTPClient: httpClient,
+					EtcdIP:       "1.1.1.1",
+					HTTPClient:   httpClient,
+					EtcdProtocol: "http",
 				}
 				client = etcd.NewClient(config)
 			})
