@@ -8,10 +8,39 @@ import (
 )
 
 var _ = Describe("#GetEtcdCerts", func() {
-	var manifest string
+	var (
+		manifest     string
+		certs        bosh.EtcdCerts
+		err          error
+		jobNameRegex string
+	)
 
-	BeforeEach(func() {
-		manifest = `---
+	JustBeforeEach(func() {
+		certs, err = bosh.GetEtcdCerts(manifest, jobNameRegex)
+	})
+
+	Context("when unmarshalling a bosh response from yaml returns an error", func() {
+		BeforeEach(func() {
+			manifest = `---
+jobs:sa
+\:''
+name: test-job1
+  properties:d:
+      ca_c|
+        -----BEGIN RSA PRIVATE KEY-----
+        IAmAFakeClientKey
+        -----END RSA PRIVATE KEY-----
+`
+		})
+		It("returns the error", func() {
+			Ω(certs).Should(Equal(bosh.EtcdCerts{}))
+			Ω(err).Should(MatchError("yaml: line 3: mapping values are not allowed in this context"))
+		})
+	})
+
+	Context("when the bosh manifest format uses 'jobs'", func() {
+		BeforeEach(func() {
+			manifest = `---
 jobs:
 - name: test-job1
   properties:
@@ -29,29 +58,94 @@ jobs:
         IAmAFakeClientKey
         -----END RSA PRIVATE KEY-----
 `
-	})
-
-	Context("when the job does not match the regex", func() {
-		It("returns an empty certs object", func() {
-			certs := bosh.GetEtcdCerts(manifest, "not-matching")
-			Ω(certs).Should(Equal(bosh.EtcdCerts{}))
 		})
 
-		Context("when the job does match the regex", func() {
-			It("returns the certs object for the first regex matched job", func() {
-				certs := bosh.GetEtcdCerts(manifest, "^test-job.*")
-				Ω(certs.CaCert).Should(Equal(`-----BEGIN CERTIFICATE-----
+		Context("when the job does not match the regex", func() {
+			BeforeEach(func() {
+				jobNameRegex = "not-matching"
+			})
+
+			It("returns an empty certs object", func() {
+				Ω(certs).Should(Equal(bosh.EtcdCerts{}))
+				Ω(err).Should(BeNil())
+			})
+
+			Context("when the job does match the regex", func() {
+				BeforeEach(func() {
+					jobNameRegex = "^test-job.*"
+				})
+
+				It("returns the certs object for the first regex matched job", func() {
+					Ω(certs.CaCert).Should(Equal(`-----BEGIN CERTIFICATE-----
 IAmAFakeCACert
 -----END CERTIFICATE-----
 `))
-				Ω(certs.ClientCert).Should(Equal(`-----BEGIN CERTIFICATE-----
+					Ω(certs.ClientCert).Should(Equal(`-----BEGIN CERTIFICATE-----
 IAmAFakeClientCert
 -----END CERTIFICATE-----
 `))
-				Ω(certs.ClientKey).Should(Equal(`-----BEGIN RSA PRIVATE KEY-----
+					Ω(certs.ClientKey).Should(Equal(`-----BEGIN RSA PRIVATE KEY-----
 IAmAFakeClientKey
 -----END RSA PRIVATE KEY-----
 `))
+					Ω(err).Should(BeNil())
+				})
+			})
+		})
+	})
+
+	Context("when the bosh manifest format uses 'instance_groups'", func() {
+		BeforeEach(func() {
+			manifest = `---
+instance_groups:
+- name: test-job1
+  properties:
+    etcd:
+      ca_cert : |
+        -----BEGIN CERTIFICATE-----
+        IAmAFakeCACert
+        -----END CERTIFICATE-----
+      client_cert: |
+        -----BEGIN CERTIFICATE-----
+        IAmAFakeClientCert
+        -----END CERTIFICATE-----
+      client_key: |
+        -----BEGIN RSA PRIVATE KEY-----
+        IAmAFakeClientKey
+        -----END RSA PRIVATE KEY-----
+`
+		})
+
+		Context("when the job does not match the regex", func() {
+			BeforeEach(func() {
+				jobNameRegex = "not-matching"
+			})
+
+			It("returns an empty certs object", func() {
+				Ω(certs).Should(Equal(bosh.EtcdCerts{}))
+				Ω(err).Should(BeNil())
+			})
+
+			Context("when the job does match the regex", func() {
+				BeforeEach(func() {
+					jobNameRegex = "^test-job.*"
+				})
+
+				It("returns the certs object for the first regex matched job", func() {
+					Ω(certs.CaCert).Should(Equal(`-----BEGIN CERTIFICATE-----
+IAmAFakeCACert
+-----END CERTIFICATE-----
+`))
+					Ω(certs.ClientCert).Should(Equal(`-----BEGIN CERTIFICATE-----
+IAmAFakeClientCert
+-----END CERTIFICATE-----
+`))
+					Ω(certs.ClientKey).Should(Equal(`-----BEGIN RSA PRIVATE KEY-----
+IAmAFakeClientKey
+-----END RSA PRIVATE KEY-----
+`))
+					Ω(err).Should(BeNil())
+				})
 			})
 		})
 	})

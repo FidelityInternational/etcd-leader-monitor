@@ -81,7 +81,10 @@ func (c *Controller) LoadCerts(deployconfig Config, deployment string) error {
 	if err != nil {
 		return err
 	}
-	etcdCerts := bosh.GetEtcdCerts(boshDeployment.Manifest, fmt.Sprintf("^%s*", deployconfig.EtcdJobName))
+	etcdCerts, err := bosh.GetEtcdCerts(boshDeployment.Manifest, fmt.Sprintf("^%s*", deployconfig.EtcdJobName))
+	if err != nil {
+		return err
+	}
 	if etcdCerts.ClientKey == "" {
 		return fmt.Errorf("Etcd Client Key was blank")
 	}
@@ -161,8 +164,7 @@ func (c *Controller) etcdProcess(etcdVMs []gogobosh.VM, etcdProtocol string, w h
 
 func errorPrint(err error, w http.ResponseWriter) {
 	if err != nil {
-		fmt.Println("An error occurred:")
-		fmt.Println(err.Error())
+		fmt.Printf("An error occurred: %v\n", err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 }
