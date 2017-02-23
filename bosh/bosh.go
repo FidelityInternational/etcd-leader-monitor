@@ -7,7 +7,8 @@ import (
 )
 
 type manifest struct {
-	Jobs []jobs `yaml:"jobs"`
+	Jobs           []jobs `yaml:"jobs"`
+	InstanceGroups []jobs `yaml:"instance_groups"`
 }
 
 type jobs struct {
@@ -27,16 +28,19 @@ type EtcdCerts struct {
 }
 
 // GetEtcdCerts - Returns Client Key/Cert and CaCert that could be used for SSL secured etcd
-func GetEtcdCerts(deploymentManifest string, jobRegex string) EtcdCerts {
+func GetEtcdCerts(deploymentManifest string, jobRegex string) (EtcdCerts, error) {
 	var deployManifest manifest
-	yaml.Unmarshal([]byte(deploymentManifest), &deployManifest)
-	for _, job := range deployManifest.Jobs {
+	if err := yaml.Unmarshal([]byte(deploymentManifest), &deployManifest); err != nil {
+		return EtcdCerts{}, err
+	}
+	jobs := append(deployManifest.Jobs, deployManifest.InstanceGroups...)
+	for _, job := range jobs {
 		matched, _ := regexp.MatchString(jobRegex, job.Name)
 		if matched {
-			return job.Properties.Etcd
+			return job.Properties.Etcd, nil
 		}
 	}
-	return EtcdCerts{}
+	return EtcdCerts{}, nil
 }
 
 // FindDeployment - takes deployments and a regex to return the first matching deployment name
