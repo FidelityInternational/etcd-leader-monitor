@@ -73,7 +73,7 @@ if [[ "$(cf app etcd-leader-monitor) || true)" == *"FAILED"* ]] ; then
   cf start "${APP_NAME:-etcd-leader-monitor}"
 else
   echo "Zero downtime deploying etcd-leader-monitor..."
-  domain=$(cf app etcd-leader-monitor | grep urls | cut -d":" -f2 | xargs | cut -d"." -f 2-)
+  domain=$(cf app etcd-leader-monitor | grep -E 'urls|routes' | cut -d":" -f2 | xargs | cut -d"." -f 2-)
   cf push "${APP_NAME:-etcd-leader-monitor}-green" -f manifest.yml -n "${APP_NAME:-etcd-leader-monitor}-green" --no-start
   setEnvs "${APP_NAME:-etcd-leader-monitor}-green"
   cf start "${APP_NAME:-etcd-leader-monitor}-green"
