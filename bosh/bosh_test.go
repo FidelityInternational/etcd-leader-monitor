@@ -45,7 +45,7 @@ jobs:
 - name: test-job1
   properties:
     etcd:
-      ca_cert : |
+      ca_cert: |
         -----BEGIN CERTIFICATE-----
         IAmAFakeCACert
         -----END CERTIFICATE-----
@@ -101,7 +101,7 @@ instance_groups:
 - name: test-job1
   properties:
     etcd:
-      ca_cert : |
+      ca_cert: |
         -----BEGIN CERTIFICATE-----
         IAmAFakeCACert
         -----END CERTIFICATE-----
@@ -126,12 +126,12 @@ instance_groups:
 				Ω(err).Should(BeNil())
 			})
 
-			Context("when the job does match the regex", func() {
+			Context("when the job does match the regex and does not have certs properties", func() {
 				BeforeEach(func() {
-					jobNameRegex = "^test-job.*"
+					jobNameRegex = "^test-job1.*"
 				})
 
-				It("returns the certs object for the first regex matched job", func() {
+				It("returns the certs object of the instance group", func() {
 					Ω(certs.CaCert).Should(Equal(`-----BEGIN CERTIFICATE-----
 IAmAFakeCACert
 -----END CERTIFICATE-----
@@ -142,6 +142,61 @@ IAmAFakeClientCert
 `))
 					Ω(certs.ClientKey).Should(Equal(`-----BEGIN RSA PRIVATE KEY-----
 IAmAFakeClientKey
+-----END RSA PRIVATE KEY-----
+`))
+					Ω(err).Should(BeNil())
+				})
+			})
+
+			Context("when the job does match the regex and does have certs properties", func() {
+				BeforeEach(func() {
+					jobNameRegex = "^test-job1.*"
+					manifest = `---
+    instance_groups:
+    - name: test-job1
+      jobs:
+      - name: etcd
+        properties:
+          etcd:
+            ca_cert: |
+              -----BEGIN CERTIFICATE-----
+              IAmAFakeCACertInAJob
+              -----END CERTIFICATE-----
+            client_cert: |
+              -----BEGIN CERTIFICATE-----
+              IAmAFakeClientCertInAJob
+              -----END CERTIFICATE-----
+            client_key: |
+              -----BEGIN RSA PRIVATE KEY-----
+              IAmAFakeClientKeyInAJob
+              -----END RSA PRIVATE KEY-----
+      properties:
+        etcd:
+          ca_cert: |
+            -----BEGIN CERTIFICATE-----
+            IAmAFakeCACert
+            -----END CERTIFICATE-----
+          client_cert: |
+            -----BEGIN CERTIFICATE-----
+            IAmAFakeClientCert
+            -----END CERTIFICATE-----
+          client_key: |
+            -----BEGIN RSA PRIVATE KEY-----
+            IAmAFakeClientKey
+            -----END RSA PRIVATE KEY-----
+    `
+				})
+				It("returns the certs object of the job", func() {
+					Ω(certs.CaCert).Should(Equal(`-----BEGIN CERTIFICATE-----
+IAmAFakeCACertInAJob
+-----END CERTIFICATE-----
+`))
+					Ω(certs.ClientCert).Should(Equal(`-----BEGIN CERTIFICATE-----
+IAmAFakeClientCertInAJob
+-----END CERTIFICATE-----
+`))
+					Ω(certs.ClientKey).Should(Equal(`-----BEGIN RSA PRIVATE KEY-----
+IAmAFakeClientKeyInAJob
 -----END RSA PRIVATE KEY-----
 `))
 					Ω(err).Should(BeNil())
