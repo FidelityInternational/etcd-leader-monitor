@@ -3,12 +3,13 @@ package etcd_test
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/FidelityInternational/etcd-leader-monitor/etcd"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+
+	"github.com/FidelityInternational/etcd-leader-monitor/etcd"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("#NewClient", func() {
@@ -38,7 +39,7 @@ var _ = Describe("#GetLeaderStats", func() {
 
 		It("returns the error", func() {
 			_, _, err := client.GetLeaderStats()
-			Ω(err).Should(MatchError(`Get http://1.1.1.1:1:4001/v2/stats/leader: dial tcp: too many colons in address 1.1.1.1:1:4001`))
+			Ω(err).Should(Or(MatchError(`Get http://1.1.1.1:1:4001/v2/stats/leader: dial tcp: too many colons in address 1.1.1.1:1:4001`), MatchError(`Get http://1.1.1.1:1:4001/v2/stats/leader: invalid URL port "1:4001"`)))
 		})
 	})
 

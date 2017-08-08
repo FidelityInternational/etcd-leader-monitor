@@ -1,14 +1,22 @@
 package bosh
 
 import (
+	"fmt"
+	"regexp"
+
 	"github.com/cloudfoundry-community/gogobosh"
 	"gopkg.in/yaml.v2"
-	"regexp"
 )
 
 type manifest struct {
-	Jobs           []jobs `yaml:"jobs"`
-	InstanceGroups []jobs `yaml:"instance_groups"`
+	Jobs           []jobs           `yaml:"jobs"`
+	InstanceGroups []instanceGroups `yaml:"instance_groups"`
+}
+
+type instanceGroups struct {
+	Name       string                  `yaml:"name"`
+	Jobs       []jobs                  `yaml:"jobs"`
+	Properties diegoDatabaseProperties `yaml:"properties"`
 }
 
 type jobs struct {
@@ -28,14 +36,33 @@ type EtcdCerts struct {
 }
 
 // GetEtcdCerts - Returns Client Key/Cert and CaCert that could be used for SSL secured etcd
-func GetEtcdCerts(deploymentManifest string, jobRegex string) (EtcdCerts, error) {
+func GetEtcdCerts(deploymentManifest string, configBlockRegex string) (EtcdCerts, error) {
 	var deployManifest manifest
 	if err := yaml.Unmarshal([]byte(deploymentManifest), &deployManifest); err != nil {
 		return EtcdCerts{}, err
 	}
-	jobs := append(deployManifest.Jobs, deployManifest.InstanceGroups...)
-	for _, job := range jobs {
-		matched, _ := regexp.MatchString(jobRegex, job.Name)
+
+	instanceGroups := deployManifest.InstanceGroups
+
+	for _, instanceGroup := range instanceGroups {
+		matched, _ := regexp.MatchString(configBlockRegex, instanceGroup.Name)
+		if matched {
+			for _, job := range instanceGroup.Jobs {
+				fmt.Printf("matched. Using manifest: %v", deploymentManifest)
+				if job.Properties.Etcd != (EtcdCerts{}) {
+					fmt.Println("Using job properties")
+					return job.Properties.Etcd, nil
+				}
+			}
+			if instanceGroup.Properties.Etcd != (EtcdCerts{}) {
+				fmt.Println("Using instanceGroup Job properties")
+				return instanceGroup.Properties.Etcd, nil
+			}
+		}
+	}
+
+	for _, job := range deployManifest.Jobs {
+		matched, _ := regexp.MatchString(configBlockRegex, job.Name)
 		if matched {
 			return job.Properties.Etcd, nil
 		}
